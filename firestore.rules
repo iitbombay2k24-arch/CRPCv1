@@ -1,0 +1,127 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- Helper functions ----
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isDYPIUUser() {
+      return isAuthenticated() &&
+        request.auth.token.email.matches('.*@dypiuinternational\\.ac\\.in');
+    }
+
+    function userRole() {
+      // This will be replaced with custom claims in production
+      // For now, read from the user document
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    // ---- USERS ----
+    match /users/{uid} {
+      allow read: if isAuthenticated() && (request.auth.uid == uid || userRole() in ['Admin', 'SuperAdmin']);
+      allow write: if isAuthenticated() && request.auth.uid == uid
+        && !('role' in request.resource.data && request.resource.data.role != resource.data.role);
+    }
+
+    // ---- CHANNELS ----
+    match /channels/{channelId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && userRole() in ['Faculty', 'Admin', 'SuperAdmin'];
+      allow update, delete: if isAuthenticated() && userRole() in ['Admin', 'SuperAdmin'];
+
+      // Channel messages
+      match /messages/{messageId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+        allow update: if isAuthenticated() && (
+          request.auth.uid == resource.data.senderId ||
+          userRole() in ['Faculty', 'Admin', 'SuperAdmin']
+        );
+        allow delete: if isAuthenticated() && (
+          request.auth.uid == resource.data.senderId ||
+          userRole() in ['Admin', 'SuperAdmin']
+        );
+      }
+    }
+
+    // ---- DMs ----
+    match /dms/{dmId} {
+      allow read, write: if isAuthenticated() &&
+        request.auth.uid in resource.data.participants;
+
+      match /messages/{messageId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+        allow delete: if isAuthenticated() && request.auth.uid == resource.data.senderId;
+      }
+    }
+
+    // ---- AUDIT LOG — Admin SDK only ----
+    match /auditLog/{logId} {
+      allow read: if isAuthenticated() && userRole() == 'SuperAdmin';
+      allow write: if false; // Only via Admin SDK (Cloud Functions)
+    }
+
+    // ---- ANNOUNCEMENTS ----
+    match /announcements/{announcementId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && userRole() in ['Faculty', 'Admin', 'SuperAdmin'];
+      allow delete: if isAuthenticated() && userRole() in ['Admin', 'SuperAdmin'];
+    }
+
+    // ---- RESOURCES ----
+    match /resources/{resourceId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && userRole() in ['Faculty', 'Admin', 'SuperAdmin'];
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated() && userRole() in ['Admin', 'SuperAdmin'];
+    }
+
+    // ---- ATTENDANCE ----
+    match /attendance/{attendanceId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+    }
+
+    // ---- GRIEVANCES ----
+    match /grievances/{ticketId} {
+      allow read: if isAuthenticated() && (
+        userRole() in ['Faculty', 'Admin', 'SuperAdmin'] ||
+        (!resource.data.isAnonymous && request.auth.uid == resource.data.authorId)
+      );
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && userRole() in ['Faculty', 'Admin', 'SuperAdmin'];
+    }
+
+    // ---- Q&A ----
+    match /questions/{questionId} {
+      allow read, write: if isAuthenticated();
+      match /answers/{answerId} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+
+    // ---- TIMETABLE ----
+    match /timetable/{slotId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && userRole() in ['Faculty', 'Admin', 'SuperAdmin'];
+    }
+
+    // ---- BOARD TASKS ----
+    match /boardTasks/{taskId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // ---- BOOKMARKS (user subcollection) ----
+    match /users/{uid}/bookmarks/{bookmarkId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == uid;
+    }
+
+    // ---- DRAFTS (user subcollection) ----
+    match /users/{uid}/drafts/{draftId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == uid;
+    }
+  }
+}
