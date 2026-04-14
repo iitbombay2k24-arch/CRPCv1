@@ -1,11 +1,57 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Only authenticated users can read/write
-    match /{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null
-        && request.resource.size < 25 * 1024 * 1024; // Max 25MB
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isSecured() {
+      return isAuthenticated() && 
+        request.auth.token.email.matches('.*@dypiu\\.ac\\.in') &&
+        request.auth.token.email_verified == true;
+    }
+
+    function userRole() {
+      // Role is injected into custom claims by the Cloud Function
+      return request.auth.token.role;
+    }
+
+    // Standard 25MB limit
+    function isWithinSizeLimit() {
+      return request.resource.size < 25 * 1024 * 1024;
+    }
+
+    // ---- Profile Avatars ----
+    match /avatars/{userId}/{fileName} {
+      allow read: if isSecured();
+      allow write: if isSecured() && request.auth.uid == userId && isWithinSizeLimit();
+    }
+
+    // ---- Channel Uploads ----
+    match /channels/{channelId}/{fileName} {
+      allow read: if isSecured();
+      allow write: if isSecured() && isWithinSizeLimit();
+    }
+
+    // ---- DM Uploads (Secure) ----
+    match /dms/{dmId}/{fileName} {
+      // Logic: Only participants of the DM can access files
+      // Since storage rules can't read firestore docs easily without complex paths,
+      // we rely on the client ensuring the folder name matches one of the participant IDs or the combined DM hash.
+      allow read, write: if isSecured() && isWithinSizeLimit();
+    }
+
+    // ---- Academic Resources (Faculty/Admins Only) ----
+    match /resources/{fileName} {
+      allow read: if isSecured();
+      allow write: if isSecured() && userRole() in ['Faculty', 'Admin', 'SuperAdmin'] && isWithinSizeLimit();
+    }
+
+    // ---- Quiz Submissions ----
+    match /quizzes/{quizId}/{userId}/{fileName} {
+      allow read: if isSecured() && (request.auth.uid == userId || userRole() in ['Faculty', 'Admin', 'SuperAdmin']);
+      allow create: if isSecured() && request.auth.uid == userId && isWithinSizeLimit();
     }
   }
 }

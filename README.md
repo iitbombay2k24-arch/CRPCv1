@@ -1,16 +1,48 @@
-# React + Vite
+# DYPIU Collab Platform 🚀
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A premium, role-based academic collaboration and campus intelligence platform designed specifically for DY Patil International University (DYPIU). 
 
-Currently, two official plugins are available:
+Built with React, Vite, Zustand, Tailwind CSS, and Firebase.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🌟 Key Features
+- **Real-Time Collaboration**: Dedicated server-like Chat & DM capability with threading, pins, and rich UI.
+- **Academic Ecosystem**: Full-fledged Live Quiz tracking, Task Boards (Kanban), Interactive Timetables, and Notice Boards.
+- **Placement Central**: Analytics and data dashboards for active job drives.
+- **Glassmorphism Design System**: Modern, dark-themed, ultra-premium UI aesthetic with animations and micro-interactions.
+- **Role-Based Access Control (RBAC)**: Deep authorization handling (Student -> Admin) across platform components.
 
-## React Compiler
+## 🛠 Tech Stack
+- **Frontend Framework:** React 18 & Vite
+- **Global State Management:** Zustand
+- **Styling:** Vanilla Tailwind CSS
+- **Icons:** Lucide-React
+- **Database / Auth:** Firebase (Firestore + Authentication)
+- **Deployment:** Vercel & Firebase Hosting (Zero-Config ready)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 📦 Getting Started
 
-## Expanding the ESLint configuration
+### Prerequisites
+- Node.js (v18+)
+- Active Firebase Project credentials
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### Installation
+1. Clone the repository and install dependencies:
+   ```bash
+   npm install
+   ```
+2. Setup environment variables by copying `.env.local`:
+   Ensure your `VITE_FIREBASE_*` config items map to your Firebase credentials.
+3. Run the development environment:
+   ```bash
+   npm run dev
+   ```
+
+### Production Build
+Run the following build command which compresses the platform down via Rollup:
+```bash
+npm run build
+```
+Once generated in the `/dist` directory, you can deploy using the pre-configured `vercel.json` or `firebase.json` templates explicitly provided.
+
+---
+*Created as a comprehensive ecosystem to unify the intelligence and spirit of DYPIU.*

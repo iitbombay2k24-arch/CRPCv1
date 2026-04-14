@@ -1,15 +1,27 @@
 import React from 'react';
 
-const paddings = { sm: 'p-3', md: 'p-4', lg: 'p-6', none: 'p-0' };
+const paddings = { sm: 'p-3', md: 'p-5', lg: 'p-7', none: 'p-0' };
+
 const variantStyles = {
-  default: 'bg-slate-800/60 border border-slate-700/50',
-  elevated: 'bg-slate-800/80 border border-slate-700/50 shadow-lg shadow-black/20',
-  glass: 'bg-white/5 backdrop-blur-md border border-white/10',
+  default: 'bg-white/[0.03] border border-white/[0.06]',
+  elevated: 'bg-white/[0.04] border border-white/[0.08] shadow-xl shadow-black/30',
+  glass: 'glass-card',
+  glow: 'bg-white/[0.03] border border-indigo-500/20 shadow-lg shadow-indigo-500/10',
 };
 
-export default function Card({ children, padding = 'md', clickable = false, variant = 'default', className = '', ...props }) {
+export default function Card({ children, padding = 'md', clickable = false, variant = 'glass', glow, className = '', ...props }) {
   return (
-    <div className={`rounded-xl transition-all duration-200 ${variantStyles[variant] || variantStyles.default} ${paddings[padding]} ${clickable ? 'cursor-pointer hover:bg-slate-700/60 hover:border-slate-600/60 active:scale-[0.98]' : ''} ${className}`} {...props}>
+    <div
+      className={`
+        rounded-2xl transition-all duration-300
+        ${variantStyles[variant] || variantStyles.glass}
+        ${paddings[padding]}
+        ${clickable ? 'cursor-pointer hover:bg-white/[0.06] hover:border-white/10 hover:shadow-xl hover:shadow-black/20 active:scale-[0.99]' : ''}
+        ${glow ? 'shadow-lg shadow-indigo-500/15 hover:shadow-indigo-500/25' : ''}
+        ${className}
+      `}
+      {...props}
+    >
       {children}
     </div>
   );

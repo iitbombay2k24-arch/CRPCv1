@@ -73,7 +73,7 @@ export async function logoutUser() {
         status: 'offline',
         lastSeen: serverTimestamp()
       });
-    } catch (e) { /* ignore if profile doesn't exist */ }
+    } catch (_) { /* ignore if profile doesn't exist */ }
   }
   await signOut(auth);
 }
@@ -93,8 +93,17 @@ export async function updateUserStatus(uid, status) {
 export function onAuthChange(callback) {
   return onAuthStateChanged(auth, async (user) => {
     if (user) {
-      const profile = await getUserProfile(user.uid);
-      callback(user, profile);
+      try {
+        const profile = await getUserProfile(user.uid);
+        callback(user, profile || { 
+          uid: user.uid, name: user.email?.split('@')[0] || 'User', email: user.email, role: 'Student', avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${user.email}` 
+        });
+      } catch (err) {
+        console.warn('Failed to fetch user profile, using fallback:', err);
+        callback(user, { 
+          uid: user.uid, name: user.email?.split('@')[0] || 'User', email: user.email, role: 'Student', avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${user.email}` 
+        });
+      }
     } else {
       callback(null, null);
     }

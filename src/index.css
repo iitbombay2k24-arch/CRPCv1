@@ -1,43 +1,18 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
-/* ============================================
-   DYPIU Collab — Global Styles
-   Design System: Dark theme, Discord-inspired
-   ============================================ */
-
-/* Google Font — Inter for modern typography */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-
-/* ---- CSS Custom Properties (Design Tokens) ---- */
-:root {
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+@theme {
+  --font-sans: 'Outfit', ui-sans-serif, system-ui, sans-serif;
   --color-primary: #6366f1;
-  --color-primary-light: #818cf8;
-  --color-primary-dark: #4f46e5;
-  --color-surface: #0f172a;
-  --color-surface-elevated: #1e293b;
-  --color-surface-overlay: #334155;
-  --color-border: rgba(148, 163, 184, 0.15);
-  --color-text-primary: #f1f5f9;
-  --color-text-secondary: #94a3b8;
-  --color-text-muted: #64748b;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-danger: #ef4444;
-  --color-info: #6366f1;
-  --sidebar-width: 280px;
-  --rail-width: 64px;
-  --topbar-height: 48px;
-  --transition-fast: 150ms ease-out;
-  --transition-normal: 200ms ease-out;
-  --transition-slow: 300ms ease-out;
 }
 
-/* ---- Global Reset & Base ---- */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+/* ============================================
+   DYPIU Collab — Global Premium Styles
+   ============================================ */
+
+:root {
+  --color-brand-start: #4318FF;
+  --color-brand-end: #868CFF;
 }
 
 html, body, #root {
@@ -47,99 +22,158 @@ html, body, #root {
 }
 
 body {
+  margin: 0;
   font-family: var(--font-sans);
-  background-color: var(--color-surface);
-  color: var(--color-text-primary);
+  background-color: #03040b; /* Extremely dark deep blue/black */
+  color: #FFFFFF;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  line-height: 1.5;
 }
 
-/* ---- Custom Scrollbar (thin and subtle) ---- */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+/* --- Global Mesh Background Animations --- */
+@keyframes meshMovement {
+  0% { transform: scale(1) translate(0, 0); }
+  33% { transform: scale(1.1) translate(2vw, -3vh); }
+  66% { transform: scale(0.9) translate(-3vw, 2vh); }
+  100% { transform: scale(1) translate(0, 0); }
 }
-.custom-scrollbar::-webkit-scrollbar-track {
+
+.mesh-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.mesh-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  animation: meshMovement 15s ease-in-out infinite alternate;
+  opacity: 0.5;
+}
+
+.mesh-orb-1 {
+  top: -10%; left: -5%;
+  width: 50vw; height: 50vw;
+  background: rgba(99, 102, 241, 0.15); /* Indigo */
+}
+
+.mesh-orb-2 {
+  bottom: -20%; right: -10%;
+  width: 60vw; height: 60vw;
+  background: rgba(168, 85, 247, 0.1); /* Purple */
+  animation-delay: -5s;
+}
+
+.mesh-orb-3 {
+  top: 30%; left: 60%;
+  width: 40vw; height: 40vw;
+  background: rgba(14, 165, 233, 0.1); /* Sky */
+  animation-delay: -10s;
+  transform: translate(-50%, -50%);
+}
+
+.mesh-grid {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(ellipse at center, black 40%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse at center, black 40%, transparent 100%);
+}
+
+/* --- Premium Utilities & Glassmorphism --- */
+.glass-panel {
+  background: rgba(15, 20, 35, 0.4);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-card {
+  background: linear-gradient(145deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.4) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-card:hover {
+  background: linear-gradient(145deg, rgba(40, 51, 69, 0.45) 0%, rgba(20, 28, 48, 0.45) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 12px 40px rgba(99, 102, 241, 0.15);
+  transform: translateY(-2px);
+}
+
+.premium-gradient-text {
+  background: linear-gradient(to right, #818cf8, #c084fc, #f472b6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.premium-gradient-bg {
+  background: linear-gradient(to right, #6366f1, #a855f7, #ec4899);
+}
+
+/* --- Scrollbar --- */
+body *::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+body *::-webkit-scrollbar-track {
   background: transparent;
 }
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.2);
-  border-radius: 100px;
+body *::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
 }
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.35);
-}
-
-/* Firefox */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.2) transparent;
+body *::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
-/* ---- Animations ---- */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
+.custom-scrollbar::-webkit-scrollbar { width: 6px; }
 
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes slideInFromLeft {
-  from { opacity: 0; transform: translateX(-20px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes slideInFromRight {
-  from { opacity: 0; transform: translateX(20px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-@keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
-  50% { box-shadow: 0 0 0 8px rgba(99, 102, 241, 0); }
-}
-
+/* --- Animations --- */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideInFromLeft { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes slideInFromRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
 
-.animate-fade-in { animation: fadeIn var(--transition-normal) ease-out; }
-.animate-slide-up { animation: slideUp var(--transition-slow) ease-out; }
-.animate-slide-left { animation: slideInFromLeft var(--transition-slow) ease-out; }
-.animate-slide-right { animation: slideInFromRight var(--transition-slow) ease-out; }
-.animate-scale-in { animation: scaleIn var(--transition-normal) ease-out; }
-.animate-pulse-glow { animation: pulseGlow 2s ease-in-out infinite; }
+.animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+.animate-slide-up { animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-slide-left { animation: slideInFromLeft 0.4s ease-out forwards; }
+.animate-slide-right { animation: slideInFromRight 0.4s ease-out forwards; }
+.animate-scale-in { animation: scaleIn 0.3s ease-out forwards; }
 
-/* Skeleton shimmer */
 .skeleton-shimmer {
-  background: linear-gradient(90deg, transparent 25%, rgba(148, 163, 184, 0.08) 50%, transparent 75%);
+  background: linear-gradient(90deg, transparent 25%, rgba(255, 255, 255, 0.05) 50%, transparent 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
 }
 
-/* ---- Focus States ---- */
+/* --- Form Elements / Focus --- */
 :focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-  border-radius: 4px;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.5);
+  border-radius: inherit;
 }
 
-/* ---- Selection ---- */
 ::selection {
-  background: rgba(99, 102, 241, 0.3);
+  background: rgba(99, 102, 241, 0.4);
   color: white;
 }
 
-/* ---- Touch targets must be 44px minimum ---- */
 @media (pointer: coarse) {
   button, a, input, select, textarea {
     min-height: 44px;

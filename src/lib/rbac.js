@@ -87,5 +87,5 @@ export function getRoleBadge(role) {
 }
 
 export function isValidDomain(email) {
-  return email?.endsWith('@dypiuinternational.ac.in');
+  return email?.endsWith('@dypiu.ac.in') || email?.endsWith('@dypiuinternational.ac.in');
 }
