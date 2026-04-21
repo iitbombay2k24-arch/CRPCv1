@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   MessageSquare, Users, Star, ArrowUp, Briefcase, 
   ChevronRight, Filter, Search, PlusCircle, Bookmark
@@ -7,46 +7,29 @@ import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Avatar from '../components/ui/Avatar';
 import useNotificationStore from '../store/notificationStore';
+import { onInterviewExperiencesChange, upvoteInterviewExperience } from '../services/firestoreService';
+import useAuthStore from '../store/authStore';
 
-const EXPERIENCES = [
-  {
-    company: 'Google',
-    role: 'Associate SWE',
-    author: 'Rahul Sharma',
-    date: '2 Days ago',
-    upvotes: 84,
-    tags: ['DSA', 'System Design'],
-    preview: "The interview was centered around dynamic programming and trie structures. Make sure you understand time complexity for every line you write..."
-  },
-  {
-    company: 'Microsoft',
-    role: 'Azure Core Intern',
-    author: 'Priya Verma',
-    date: '1 Week ago',
-    upvotes: 120,
-    tags: ['Networking', 'OS'],
-    preview: "They asked deep questions about CPU scheduling and memory management. The recruiter was very friendly but focused on logical clarity."
-  },
-  {
-    company: 'NVIDIA',
-    role: 'Hardware Engineer',
-    author: 'Amit Goel',
-    date: '3 Days ago',
-    upvotes: 45,
-    tags: ['Verilog', 'Computer Arch'],
-    preview: "Focus on pipelining and cache coherence. The second round was entirely whiteboard-based architecture design."
-  }
-];
+
 
 export default function InterviewForumPage() {
+  const { user } = useAuthStore();
   const [search, setSearch] = useState('');
-  const [experiences, setExperiences] = useState(EXPERIENCES);
+  const [experiences, setExperiences] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const { info, success } = useNotificationStore();
 
-  const handleUpvote = (idx) => {
-    const newExp = [...experiences];
-    newExp[idx].upvotes += 1;
-    setExperiences(newExp);
+  useEffect(() => {
+    const unsub = onInterviewExperiencesChange((data) => {
+      setExperiences(data);
+      setIsLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleUpvote = async (id) => {
+    if (!user) return;
+    await upvoteInterviewExperience(id, user.uid);
   };
 
   const filtered = experiences.filter(e => 
@@ -66,7 +49,6 @@ export default function InterviewForumPage() {
             <h2 className="font-bold text-sm text-white">Interview Experience Forum</h2>
             <p className="text-[11px] text-slate-500">Learn from seniors who cleared top companies</p>
           </div>
-        </div>
         </div>
         <Button onClick={() => info('Share Experience', 'Contribution portal opening soon')} variant="primary" icon={PlusCircle}>Share Experience</Button>
       </div>
@@ -99,12 +81,18 @@ export default function InterviewForumPage() {
               >
                 <div className="flex flex-col items-center gap-1 shrink-0">
                   <button 
-                    onClick={() => handleUpvote(i)}
-                    className="p-2 rounded-xl bg-white/[0.03] text-slate-500 group-hover:bg-indigo-500/10 group-hover:text-indigo-400 transition-all active:scale-95"
+                    onClick={() => handleUpvote(exp.id)}
+                    className={`p-2 rounded-xl transition-all active:scale-95 border
+                      ${exp.upvotedBy?.includes(user?.uid) 
+                        ? 'bg-indigo-500 text-white border-indigo-400' 
+                        : 'bg-white/[0.03] text-slate-500 border-transparent group-hover:bg-indigo-500/10 group-hover:text-indigo-400'
+                      }`}
                   >
                     <ArrowUp size={20} />
                   </button>
-                  <span className="text-xs font-black text-slate-400">{exp.upvotes}</span>
+                  <span className={`text-xs font-black ${exp.upvotedBy?.includes(user?.uid) ? 'text-indigo-400' : 'text-slate-400'}`}>
+                    {exp.upvotes || 0}
+                  </span>
                 </div>
 
                 <div className="flex-1 min-w-0">

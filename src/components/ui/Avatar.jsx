@@ -34,12 +34,13 @@ function getGradient(name) {
   return gradients[Math.abs(h) % gradients.length];
 }
 
-export default function Avatar({ name, photoURL, size = 'md', status, border, className = '' }) {
+export default function Avatar({ name, photoURL, src, size = 'md', status, border, className = '' }) {
+  const imgSrc = photoURL || src;
   return (
     <div className={`relative inline-flex shrink-0 ${className}`}>
-      {photoURL ? (
+      {imgSrc ? (
         <img
-          src={photoURL}
+          src={imgSrc}
           alt={name}
           className={`${sizes[size]} rounded-2xl object-cover ${border ? 'ring-2 ring-indigo-500/60 ring-offset-2 ring-offset-slate-900' : ''}`}
         />

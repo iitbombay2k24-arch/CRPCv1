@@ -13,6 +13,7 @@ import CreateChannelModal from '../../modals/CreateChannelModal';
 import useUIStore from '../../store/uiStore';
 import useChannelStore from '../../store/channelStore';
 import useAuthStore from '../../store/authStore';
+import { canAccessTab, hasPermission } from '../../lib/rbac';
 import Avatar from '../ui/Avatar';
 import Badge from '../ui/Badge';
 
@@ -56,6 +57,7 @@ const NAV_SECTIONS = [
     items: [
       { id: 'grievances', label: 'Grievances', icon: ShieldAlert, color: 'text-rose-400' },
       { id: 'group-study', label: 'Study Rooms', icon: Users, color: 'text-emerald-400' },
+      { id: 'blogs', label: 'Campus Blogs', icon: Sparkles, color: 'text-amber-400' },
     ],
   },
 ];
@@ -69,7 +71,9 @@ export default function Sidebar() {
   const [collapsedSections, setCollapsedSections] = useState({});
   const [showDMs, setShowDMs] = useState(true);
 
-  const isAdmin = user?.roleLevel >= 3;
+  const currentRole = user?.role;
+  const isAdmin = canAccessTab(currentRole, 'admin');
+  const canCreateChannel = hasPermission(currentRole, 'CREATE_CHANNEL');
 
   useEffect(() => {
     const unsub = onUsersChange((data) => {
@@ -134,6 +138,8 @@ export default function Sidebar() {
       <div className="flex-1 overflow-y-auto custom-scrollbar py-3 px-2 space-y-0.5">
         {NAV_SECTIONS.map((section) => (
           <div key={section.title} className="mb-1">
+            {section.items.some((item) => canAccessTab(currentRole, item.id)) && (
+              <>
             <button
               onClick={() => toggleSection(section.title)}
               className="
@@ -152,7 +158,7 @@ export default function Sidebar() {
 
             {!collapsedSections[section.title] && (
               <div className="space-y-0.5 mt-0.5">
-                {section.items.map((item) => {
+                {section.items.filter((item) => canAccessTab(currentRole, item.id)).map((item) => {
                   const isActive = activeTab === item.id;
                   return (
                     <button
@@ -179,6 +185,8 @@ export default function Sidebar() {
                   );
                 })}
               </div>
+            )}
+              </>
             )}
           </div>
         ))}
@@ -218,6 +226,7 @@ export default function Sidebar() {
               </h3>
               <button
                 onClick={() => setIsModalOpen(true)}
+                disabled={!canCreateChannel}
                 className="p-1 rounded-lg text-slate-600 hover:text-white hover:bg-white/8 transition-all"
               >
                 <Plus size={12} />

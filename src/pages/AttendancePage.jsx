@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   ClipboardCheck, UserCheck, UserX, History, FileSpreadsheet, Search, Filter, 
-  QrCode, ScanLine, MapPin, X
+  QrCode, ScanLine, MapPin, X, AlertCircle
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
@@ -42,6 +42,33 @@ export default function AttendancePage() {
   const canMark = hasPermission(user.role, 'MARK_ATTENDANCE');
   const rate = Number(metrics.overallPercentage);
   const isGood = rate >= 75;
+
+  // Predictive Analytics: Safe Cuts vs Needed Classes
+  const getSafeAnalytics = () => {
+    const present = attendance.filter((a) => a.status === 'Present').length;
+    const total = metrics.totalSessions;
+    if (total === 0) return { type: 'neutral', text: 'Attend your first lecture' };
+
+    if (rate >= 75) {
+      // How many can I skip?
+      const canSkip = Math.floor((present / 0.75) - total);
+      return { 
+        type: 'success', 
+        text: canSkip > 0 ? `You can safely skip ${canSkip} more lectures.` : 'On the edge! Attend the next class.',
+        val: canSkip
+      };
+    } else {
+      // How many do I need?
+      const needed = Math.ceil((0.75 * total - present) / 0.25);
+      return { 
+        type: 'danger', 
+        text: `You need to attend ${needed} more lectures consecutively.`,
+        val: needed
+      };
+    }
+  };
+
+  const analytics = getSafeAnalytics();
 
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371; // Radius of the earth in km
@@ -159,6 +186,19 @@ export default function AttendancePage() {
           <div className="h-8 w-px bg-white/[0.08] hidden sm:block" />
           <Button variant="secondary" icon={FileSpreadsheet} size="sm" onClick={handleExport}>Export</Button>
         </div>
+      </div>
+
+      {/* Analytics Banner */}
+      <div className={`px-7 py-3 border-b border-white/[0.05] flex items-center justify-between
+        ${analytics.type === 'success' ? 'bg-emerald-500/5 text-emerald-400' : analytics.type === 'danger' ? 'bg-rose-500/5 text-rose-400' : 'bg-white/5 text-slate-400'}`}>
+        <div className="flex items-center gap-2">
+          <AlertCircle size={14} />
+          <span className="text-[10px] font-black uppercase tracking-widest">Academic Health Check:</span>
+          <span className="text-xs font-bold">{analytics.text}</span>
+        </div>
+        <Badge variant={analytics.type === 'success' ? 'success' : 'danger'} size="xs">
+          {analytics.type === 'success' ? `+${analytics.val} Margin` : `-${analytics.val} Shortfall`}
+        </Badge>
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar p-7">

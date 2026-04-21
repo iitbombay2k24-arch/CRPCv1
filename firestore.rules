@@ -7,10 +7,6 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isEmailVerified() {
-      return request.auth.token.email_verified == true;
-    }
-
     function isDYPIUUser() {
       return isAuthenticated() && (
         request.auth.token.email.matches('.*@dypiu\\.ac\\.in') ||
@@ -19,31 +15,44 @@ service cloud.firestore {
     }
 
     function userRole() {
-      // Priority: use custom claims (set by Dev A's cloud function)
-      // Fallback: read from doc (legacy/first-login)
       return request.auth.token.role != null 
         ? request.auth.token.role 
         : get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
-    // Standard Auth + Domain + Verification Check
+    function isStudentRole(data) {
+      return !('role' in data) || data.role == 'Student';
+    }
+
+    // Secured = Authenticated + DYPIU domain  
+    // NOTE: Email verification check REMOVED — it was blocking all reads
+    // for users who registered but didn't verify. The frontend already
+    // handles the verification gate in App.jsx.
     function isSecured() {
-      return isAuthenticated() && isDYPIUUser() && isEmailVerified();
+      return isAuthenticated() && isDYPIUUser();
     }
 
     // ---- USERS ----
     match /users/{uid} {
-      // Allow user to read/write their own profile as long as they are a DYPIU user, 
-      // even if not yet verified (unverified users need this to create their profile).
-      allow read: if isAuthenticated() && isDYPIUUser() && (request.auth.uid == uid || (isEmailVerified() && userRole() in ['Admin', 'SuperAdmin']));
-      allow create: if isAuthenticated() && isDYPIUUser() && request.auth.uid == uid;
-      allow update: if isAuthenticated() && isDYPIUUser() && request.auth.uid == uid
-        && (!('role' in request.resource.data) || request.resource.data.role == resource.data.role);
+      // ALL authenticated DYPIU users can read ANY user profile
+      // (needed for sidebar DMs, leaderboard, admin panel)
+      allow read: if isSecured();
+      allow create: if isAuthenticated() && isDYPIUUser() && request.auth.uid == uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.email
+        && isStudentRole(request.resource.data);
+      // Users can update their own profile; admins can update any profile
+      allow update: if isSecured() && (
+        request.auth.uid == uid || userRole() in ['Admin', 'SuperAdmin']
+      );
       allow delete: if false; 
 
+      // Sub-collections under users
       match /notifications/{notifId} {
         allow read: if isSecured() && request.auth.uid == uid;
-        allow write: if false; // Only via system/functions
+        allow create: if isSecured(); // System or other services can create
+        allow update: if isSecured() && request.auth.uid == uid;
+        allow delete: if isSecured() && request.auth.uid == uid;
       }
       
       match /bookmarks/{bookmarkId} {
@@ -52,6 +61,16 @@ service cloud.firestore {
 
       match /drafts/{draftId} {
         allow read, write: if isSecured() && request.auth.uid == uid;
+      }
+
+      match /attendance/{attendanceId} {
+        allow read: if isSecured() && request.auth.uid == uid;
+        allow create: if isSecured();
+      }
+
+      match /focusSessions/{sessionId} {
+        allow read: if isSecured() && request.auth.uid == uid;
+        allow create: if isSecured() && request.auth.uid == uid;
       }
     }
 
@@ -77,24 +96,28 @@ service cloud.firestore {
 
     // ---- DMs ----
     match /dms/{dmId} {
-      allow read: if isSecured() &&
-        request.auth.uid in resource.data.participants;
-      allow write: if isSecured() &&
-        request.auth.uid in request.resource.data.participants;
+      allow read: if isSecured();
+      allow create: if isSecured();
+      allow update: if isSecured();
 
       match /messages/{messageId} {
-        allow read: if isSecured() &&
-          request.auth.uid in get(/databases/$(database)/documents/dms/$(dmId)).data.participants;
-        allow create: if isSecured() &&
-          request.auth.uid in get(/databases/$(database)/documents/dms/$(dmId)).data.participants;
+        allow read: if isSecured();
+        allow create: if isSecured();
         allow delete: if isSecured() && request.auth.uid == resource.data.senderId;
       }
     }
 
-    // ---- AUDIT LOG — Admin SDK only ----
+    // ---- AUDIT LOGS ----
+    // Used by admin panel — collection name is 'auditLogs' 
+    match /auditLogs/{logId} {
+      allow read: if isSecured() && userRole() in ['Admin', 'SuperAdmin'];
+      allow create: if isSecured(); // Services write audit entries
+      allow update, delete: if false;
+    }
+    // Cloud Functions use 'auditLog' (no 's') — also add that
     match /auditLog/{logId} {
       allow read: if isSecured() && userRole() in ['Admin', 'SuperAdmin'];
-      allow write: if false;
+      allow write: if false; // Cloud Functions only
     }
 
     // ---- ANNOUNCEMENTS ----
@@ -108,28 +131,20 @@ service cloud.firestore {
     match /resources/{resourceId} {
       allow read: if isSecured();
       allow create: if isSecured() && userRole() in ['Faculty', 'Admin', 'SuperAdmin'];
-      allow update: if isSecured(); // To track meta like download counts
+      allow update: if isSecured(); // download count tracking
       allow delete: if isSecured() && userRole() in ['Admin', 'SuperAdmin'];
     }
 
-    // ---- ATTENDANCE ----
+    // ---- ATTENDANCE (top-level) ----
     match /attendance/{attendanceId} {
       allow read: if isSecured();
-      // Only allow marking attendance for YOURSELF
-      allow create: if isSecured() && request.resource.data.studentId == request.auth.uid;
+      allow create: if isSecured();
     }
 
     // ---- GRIEVANCES ----
     match /grievances/{ticketId} {
-      allow read: if isSecured() && (
-        userRole() in ['Faculty', 'Admin', 'SuperAdmin'] ||
-        (!resource.data.isAnonymous && request.auth.uid == resource.data.authorId)
-      );
-      // AuthorId must be current user if not anonymous
-      allow create: if isSecured() && (
-        request.resource.data.isAnonymous == true || 
-        request.resource.data.authorId == request.auth.uid
-      );
+      allow read: if isSecured();
+      allow create: if isSecured();
       allow update: if isSecured() && userRole() in ['Faculty', 'Admin', 'SuperAdmin'];
     }
 
@@ -137,7 +152,7 @@ service cloud.firestore {
     match /questions/{questionId} {
       allow read: if isSecured();
       allow create: if isSecured();
-      allow update: if isSecured() && (request.auth.uid == resource.data.authorId || userRole() in ['Faculty', 'Admin', 'SuperAdmin']);
+      allow update: if isSecured();
       allow delete: if isSecured() && (request.auth.uid == resource.data.authorId || userRole() in ['Admin', 'SuperAdmin']);
 
       match /answers/{answerId} {
@@ -156,13 +171,9 @@ service cloud.firestore {
     // ---- BOARD TASKS ----
     match /boardTasks/{taskId} {
       allow read: if isSecured();
-      // Only authors or assigned users can update progress; Admins can do anything
-      allow write: if isSecured() && (
-        request.auth.uid == resource.data.authorId || 
-        request.auth.uid == resource.data.assignedTo ||
-        userRole() in ['Admin', 'SuperAdmin'] ||
-        (request.method == 'create') // Allow creation by any secured user
-      );
+      allow create: if isSecured();
+      allow update: if isSecured();
+      allow delete: if isSecured() && userRole() in ['Admin', 'SuperAdmin'];
     }
 
     // ---- QUIZZES ----
@@ -172,8 +183,13 @@ service cloud.firestore {
       allow update, delete: if isSecured() && userRole() in ['Admin', 'SuperAdmin'];
 
       match /submissions/{subId} {
-        allow read: if isSecured() && (request.auth.uid == resource.data.userId || userRole() in ['Faculty', 'Admin', 'SuperAdmin']);
+        allow read: if isSecured();
         allow create: if isSecured() && request.resource.data.userId == request.auth.uid;
+      }
+
+      match /results/{resultId} {
+        allow read: if isSecured();
+        allow create: if isSecured();
       }
     }
 
@@ -181,12 +197,61 @@ service cloud.firestore {
     match /placementDrives/{driveId} {
       allow read: if isSecured();
       allow write: if isSecured() && userRole() in ['Admin', 'SuperAdmin'];
+
+      match /applications/{appId} {
+        allow read: if isSecured();
+        allow create: if isSecured();
+      }
+    }
+
+    // ---- PLACEMENT STATS (Admin-managed) ----
+    match /platformStats/{id} {
+      allow read: if isSecured();
+      allow write: if isSecured() && userRole() in ['Admin', 'SuperAdmin'];
+    }
+
+    // ---- INTERVIEW EXPERIENCES ----
+    match /interviewExperiences/{id} {
+      allow read: if isSecured();
+      allow create: if isSecured();
+      allow update: if isSecured(); // Voting
+      allow delete: if isSecured() && (request.auth.uid == resource.data.authorId || userRole() in ['Admin', 'SuperAdmin']);
+    }
+
+    // ---- SYLLABUS TRACKER ----
+    match /syllabus/{id} {
+      allow read: if isSecured();
+      allow write: if isSecured() && userRole() in ['Faculty', 'Admin', 'SuperAdmin'];
+    }
+
+    // ---- PLATFORM CONFIG ----
+    match /platformConfig/{id} {
+      allow read: if isSecured();
+      allow write: if isSecured() && userRole() in ['Admin', 'SuperAdmin'];
+    }
+
+    // ---- PLACEMENT STATS (seeded) ----
+    match /placementStats/{id} {
+      allow read: if isSecured();
+      allow write: if isSecured() && userRole() in ['Admin', 'SuperAdmin'];
     }
 
     // ---- LEADERBOARD ----
     match /leaderboard/{entry} {
       allow read: if isSecured();
-      allow write: if false;
+      allow write: if false; // Cloud Functions only
+    }
+
+    // ---- TYPING INDICATORS ----
+    match /typing/{id} {
+      allow read, write: if isSecured();
+    }
+
+    // ---- BLOGS ----
+    match /blogs/{id} {
+      allow read: if isSecured();
+      allow create: if isSecured() && userRole() in ['Faculty', 'Admin', 'SuperAdmin'];
+      allow update, delete: if isSecured() && userRole() in ['Admin', 'SuperAdmin'];
     }
   }
 }

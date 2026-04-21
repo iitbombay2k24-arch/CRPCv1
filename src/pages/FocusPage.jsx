@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Timer, Play, Pause, RotateCcw, Brain, Target, Bell, Settings, History } from 'lucide-react';
 import Badge from '../components/ui/Badge';
+import useAuthStore from '../store/authStore';
+import useNotificationStore from '../store/notificationStore';
+import { saveFocusSession } from '../services/firestoreService';
 
 const MODES = [
   { label: 'Focus',       minutes: 25, color: 'text-indigo-400' },
@@ -9,6 +12,8 @@ const MODES = [
 ];
 
 export default function FocusPage() {
+  const { user } = useAuthStore();
+  const { success } = useNotificationStore();
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [isActive, setIsActive] = useState(false);
   const [modeIdx, setModeIdx] = useState(0);
@@ -25,14 +30,20 @@ export default function FocusPage() {
         if (p <= 1) {
           clearInterval(t);
           setIsActive(false);
-          if (modeIdx === 0) setSessions((s) => s + 1);
+          if (modeIdx === 0) {
+            setSessions((s) => s + 1);
+            if (user?.uid) {
+              saveFocusSession(user.uid, MODES[0].minutes, user.name);
+              success('+3 Engagement Points', 'Focus session completed!');
+            }
+          }
           return 0;
         }
         return p - 1;
       });
     }, 1000);
     return () => clearInterval(t);
-  }, [isActive, modeIdx, timeLeft]);
+  }, [isActive, modeIdx, timeLeft, user?.uid, user?.name, success]);
 
   const handleMode = (idx) => {
     setModeIdx(idx);

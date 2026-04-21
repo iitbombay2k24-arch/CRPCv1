@@ -94,7 +94,7 @@ export default function QuizPage() {
     }, 1000);
 
     return () => stopTimer();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeQuiz, isFinished]);
 
   const handleNext = useCallback(() => {
@@ -126,8 +126,8 @@ export default function QuizPage() {
     const secs = result.timeTaken % 60;
     const grade = accuracy >= 90 ? { label: 'Excellent', color: 'text-emerald-400' }
       : accuracy >= 75 ? { label: 'Good', color: 'text-indigo-400' }
-      : accuracy >= 50 ? { label: 'Average', color: 'text-amber-400' }
-      : { label: 'Needs Work', color: 'text-rose-400' };
+        : accuracy >= 50 ? { label: 'Average', color: 'text-amber-400' }
+          : { label: 'Needs Work', color: 'text-rose-400' };
 
     return (
       <div className="h-full flex flex-col items-center justify-center p-8 animate-fade-in">
@@ -215,8 +215,8 @@ export default function QuizPage() {
             ${isUrgent
               ? 'bg-rose-600 text-white shadow-xl shadow-rose-600/30 animate-pulse'
               : isWarning
-              ? 'bg-amber-500/20 border border-amber-500/40 text-amber-400'
-              : 'bg-white/[0.05] border border-white/[0.08] text-white'
+                ? 'bg-amber-500/20 border border-amber-500/40 text-amber-400'
+                : 'bg-white/[0.05] border border-white/[0.08] text-white'
             }
           `}>
             <Clock size={16} />

@@ -8,15 +8,35 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  sendEmailVerification
+  sendEmailVerification,
+  reload
 } from 'firebase/auth';
 import {
   doc, setDoc, getDoc, collection, getDocs, updateDoc, serverTimestamp
 } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
+import { ROLE_LEVEL, ROLES, isValidDomain } from '../lib/rbac';
+import { STUDENT_MASTER_LIST } from '../lib/studentData';
+
+function normalizeUserProfile(data = {}, uid) {
+  const safeRole = ROLE_LEVEL[data.role] ? data.role : ROLES.STUDENT;
+  return {
+    uid,
+    ...data,
+    role: safeRole,
+    roleLevel: ROLE_LEVEL[safeRole]
+  };
+}
+
+function assertValidInstitutionEmail(email) {
+  if (!isValidDomain(email)) {
+    throw new Error('Use your DYPIU institutional email to continue.');
+  }
+}
 
 // ---- LOGIN ----
 export async function loginUser(email, password) {
+  assertValidInstitutionEmail(email);
   const cred = await signInWithEmailAndPassword(auth, email, password);
   const userDoc = await getDoc(doc(db, 'users', cred.user.uid));
   if (userDoc.exists()) {
@@ -24,13 +44,21 @@ export async function loginUser(email, password) {
       status: 'online',
       lastSeen: serverTimestamp()
     });
-    return { uid: cred.user.uid, ...userDoc.data() };
+    return normalizeUserProfile(userDoc.data(), cred.user.uid);
   }
   return null;
 }
 
 // ---- REGISTER ----
-export async function registerUser({ email, password, name, prn, role, division, batch, branch }) {
+export async function registerUser({ email, password, name, prn, division, batch, branch }) {
+  assertValidInstitutionEmail(email);
+
+  // MASTER PRN VALIDATION
+  const masterRecord = STUDENT_MASTER_LIST.find(s => s.prn === prn);
+  if (!masterRecord) {
+    throw new Error('Invalid PRN. Enrollment verification failed. Please check your PRN or contact admin.');
+  }
+
   const cred = await createUserWithEmailAndPassword(auth, email, password);
 
   // Send email verification (PRD: unverified users cannot access app)
@@ -39,12 +67,12 @@ export async function registerUser({ email, password, name, prn, role, division,
   const userData = {
     uid: cred.user.uid,
     email,
-    name,
-    prn: prn || '',
-    role: role || 'Student',
-    division: division || 'A',
-    batch: batch || '',
-    branch: branch || '',
+    name: masterRecord.name || name, // Prefer official records
+    prn: prn,
+    role: ROLES.STUDENT,
+    division: masterRecord.div || division || 'A',
+    batch: batch || '2024-2028',
+    branch: branch || 'Computer Engineering',
     cgpa: 0,
     isActive: true,
     status: 'online',
@@ -61,7 +89,26 @@ export async function registerUser({ email, password, name, prn, role, division,
   };
 
   await setDoc(doc(db, 'users', cred.user.uid), userData);
-  return { uid: cred.user.uid, ...userData };
+  return normalizeUserProfile(userData, cred.user.uid);
+}
+
+export async function resendVerificationEmail() {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('No authenticated user found. Please sign in again.');
+  }
+  if (user.emailVerified) {
+    return { alreadyVerified: true };
+  }
+  await sendEmailVerification(user);
+  return { alreadyVerified: false };
+}
+
+export async function refreshCurrentUser() {
+  const user = auth.currentUser;
+  if (!user) return null;
+  await reload(user);
+  return auth.currentUser;
 }
 
 // ---- LOGOUT ----
@@ -81,7 +128,7 @@ export async function logoutUser() {
 // ---- GET USER PROFILE ----
 export async function getUserProfile(uid) {
   const snap = await getDoc(doc(db, 'users', uid));
-  return snap.exists() ? { uid: snap.id, ...snap.data() } : null;
+  return snap.exists() ? normalizeUserProfile(snap.data(), snap.id) : null;
 }
 
 // ---- UPDATE USER STATUS ----
@@ -96,12 +143,22 @@ export function onAuthChange(callback) {
       try {
         const profile = await getUserProfile(user.uid);
         callback(user, profile || { 
-          uid: user.uid, name: user.email?.split('@')[0] || 'User', email: user.email, role: 'Student', avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${user.email}` 
+          uid: user.uid,
+          name: user.email?.split('@')[0] || 'User',
+          email: user.email,
+          role: ROLES.STUDENT,
+          roleLevel: ROLE_LEVEL[ROLES.STUDENT],
+          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${user.email}` 
         });
       } catch (err) {
         console.warn('Failed to fetch user profile, using fallback:', err);
         callback(user, { 
-          uid: user.uid, name: user.email?.split('@')[0] || 'User', email: user.email, role: 'Student', avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${user.email}` 
+          uid: user.uid,
+          name: user.email?.split('@')[0] || 'User',
+          email: user.email,
+          role: ROLES.STUDENT,
+          roleLevel: ROLE_LEVEL[ROLES.STUDENT],
+          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${user.email}` 
         });
       }
     } else {

@@ -18,8 +18,7 @@ export default function GlobalSearchModal({ isOpen, onClose }) {
   const [results, setResults] = useState({ users: [], resources: [], messages: [] });
   const [isSearching, setIsSearching] = useState(false);
   const inputRef = useRef(null);
-  
-  const { setActiveTab } = useUIStore();
+  const { setActiveTab, setDmTarget } = useUIStore();
 
 
   useEffect(() => {
@@ -68,8 +67,6 @@ export default function GlobalSearchModal({ isOpen, onClose }) {
   }, [query]);
 
   if (!isOpen) return null;
-
-  const { setActiveTab, setDmTarget } = useUIStore();
 
   const handleSelectResult = (type, data) => {
     if (type === 'resource') {

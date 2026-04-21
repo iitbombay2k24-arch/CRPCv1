@@ -5,11 +5,12 @@
 
 import {
   collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc,
-  query, where, orderBy, limit, onSnapshot, increment, serverTimestamp
+  query, where, orderBy, limit, onSnapshot, increment, serverTimestamp, writeBatch
 } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../lib/firebase';
 import { formatTimeAgo } from '../lib/utils';
+import { STUDENT_MASTER_LIST } from '../lib/studentData';
 
 // ===================== CHANNELS =====================
 
@@ -337,9 +338,13 @@ export function onQuizzesChange(callback) {
   });
 }
 
-export async function submitQuizResult({ quizId, studentId, studentName, score, total }) {
+export async function submitQuizResult(quizId, resultData) {
+  const { userId, userName, score, total, answers, timeTaken } = resultData || {};
   return await addDoc(collection(db, 'quizzes', quizId, 'results'), {
-    studentId, studentName, score, total, submittedAt: serverTimestamp()
+    studentId: userId, studentName: userName, score, total,
+    answers: answers || {},
+    timeTaken: timeTaken || 0,
+    submittedAt: serverTimestamp()
   });
 }
 
@@ -409,6 +414,98 @@ export function onGlobalStatsChange(callback) {
     return unsubChannels;
   });
   return unsubUsers;
+}
+
+export function onPlacementStatsChange(callback) {
+  return onSnapshot(doc(db, 'platformStats', 'placement'), (docSnap) => {
+    if (docSnap.exists()) {
+      callback(docSnap.data());
+    } else {
+      callback(null);
+    }
+  });
+}
+
+export async function updatePlacementStats(stats) {
+  const statsRef = doc(db, 'platformStats', 'placement');
+  await setDoc(statsRef, {
+    ...stats,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+}
+
+export async function createPlacementDrive(drive) {
+  return await addDoc(collection(db, 'placementDrives'), {
+    ...drive,
+    createdAt: serverTimestamp()
+  });
+}
+
+// ===================== USER MANAGEMENT =====================
+
+export async function updateUserRole(uid, role, level) {
+  await updateDoc(doc(db, 'users', uid), {
+    role,
+    roleLevel: level,
+    updatedAt: serverTimestamp()
+  });
+}
+
+export async function bulkSyncStudents() {
+  const batchLimit = 500; // Firestore batch limit
+  let count = 0;
+  
+  // Note: For 700+ users, we should ideally use multiple batches
+  // But for this institutional startup, we'll do an optimized loop
+  for (const student of STUDENT_MASTER_LIST) {
+    const studentId = `ghost-${student.prn}`;
+    const userRef = doc(db, 'users', studentId);
+    
+    // Check if exists
+    const snap = await getDoc(userRef);
+    if (!snap.exists()) {
+      await setDoc(userRef, {
+        name: student.name,
+        prn: student.prn,
+        division: `Division ${student.div}`,
+        role: 'Student',
+        roleLevel: 1,
+        isGhost: true, // Marker for pre-registered users
+        engagementScore: 0,
+        createdAt: serverTimestamp()
+      });
+      count++;
+    }
+  }
+  return count;
+}
+
+// ===================== SYSTEM CONFIG =====================
+
+export async function updatePlatformConfig(config) {
+  await setDoc(doc(db, 'platformConfig', 'general'), {
+    ...config,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+}
+
+export function onPlatformConfigChange(callback) {
+  return onSnapshot(doc(db, 'platformConfig', 'general'), (snap) => {
+    callback(snap.data());
+  });
+}
+
+export async function resetSemesterEngagement() {
+  const usersRef = collection(db, 'users');
+  const snap = await getDocs(usersRef);
+  
+  const batch = snap.docs.map(u => updateDoc(u.ref, { 
+    engagementScore: 0,
+    badges: [],
+    streak: 0
+  }));
+  
+  await Promise.all(batch);
 }
 
 // ===================== DM READ RECEIPTS =====================
@@ -566,10 +663,38 @@ export function onAttendanceChange(userId, callback) {
     orderBy('timestamp', 'desc')
   );
   return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => ({ 
-      id: d.id, ...d.data(), 
-      date: d.data().timestamp?.toDate()?.toLocaleDateString() || 'Recently' 
-    })));
+    callback(snap.docs.map(d => {
+      const ts = d.data().timestamp?.toDate();
+      return { 
+        id: d.id, ...d.data(), 
+        dateStr: ts ? ts.toLocaleDateString() : 'Recently',
+        timeStr: ts ? ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
+      };
+    }));
+  });
+}
+
+// ===================== FOCUS TIMER =====================
+
+export async function saveFocusSession(uid, minutes, userName) {
+  // Add to sub-collection
+  await addDoc(collection(db, 'users', uid, 'focusSessions'), {
+    minutes,
+    title: 'Focus Session',
+    timestamp: serverTimestamp()
+  });
+  
+  // Increment global engagement score (+3 for a focus session)
+  const userRef = doc(db, 'users', uid);
+  await updateDoc(userRef, {
+    engagementScore: increment(3)
+  });
+  
+  // Log it
+  await createAuditLog({
+    action: 'Pomodoro Completed',
+    actorName: userName,
+    details: `Completed a ${minutes}-minute focus session.`
   });
 }
 
@@ -666,26 +791,6 @@ export async function clearAllNotifications(userId) {
 
 // ===================== TASK BOARD =====================
 
-export function onBoardTasksChange(filters, callback) {
-  const q = query(collection(db, 'boardTasks'), orderBy('createdAt', 'desc'));
-  return onSnapshot(q, (snap) => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-}
-
-export async function createBoardTask(data) {
-  return await addDoc(collection(db, 'boardTasks'), {
-    ...data,
-    createdAt: serverTimestamp()
-  });
-}
-
-export async function updateBoardTaskStatus(id, status) {
-  await updateDoc(doc(db, 'boardTasks', id), { status });
-}
-
-export async function deleteBoardTask(id) {
-  await deleteDoc(doc(db, 'boardTasks', id));
-}
-
 export async function seedInitialTasks() {
   const tasks = [
     { title: 'Finalize Cloud Viva Prep', priority: 'High', status: 'todo', category: 'Exam', assignee: 'Me' },
@@ -731,3 +836,113 @@ export function onAuditLogChange(callback) {
   });
 }
 
+// ===================== INTERVIEW FORUM =====================
+
+export function onInterviewExperiencesChange(callback) {
+  const q = query(collection(db, 'interviewExperiences'), orderBy('createdAt', 'desc'));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => ({
+      id: d.id, ...d.data(),
+      date: formatTimeAgo(d.data().createdAt?.toDate())
+    })));
+  });
+}
+
+export async function addInterviewExperience(data) {
+  return await addDoc(collection(db, 'interviewExperiences'), {
+    ...data,
+    upvotes: 0,
+    upvotedBy: [],
+    createdAt: serverTimestamp()
+  });
+}
+
+export async function upvoteInterviewExperience(id, userId) {
+  const ref = doc(db, 'interviewExperiences', id);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+  const data = snap.data();
+  const upvotedBy = data.upvotedBy || [];
+  
+  if (upvotedBy.includes(userId)) {
+    await updateDoc(ref, {
+      upvotes: increment(-1),
+      upvotedBy: upvotedBy.filter(u => u !== userId)
+    });
+  } else {
+    await updateDoc(ref, {
+      upvotes: increment(1),
+      upvotedBy: [...upvotedBy, userId]
+    });
+  }
+}
+
+// ===================== SYLLABUS TRACKER =====================
+
+export function onSyllabusChange(callback) {
+  const q = query(collection(db, 'syllabus'), orderBy('priority', 'asc'));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+}
+
+export async function updateTopicStatus(syllabusId, topicId, status) {
+  const ref = doc(db, 'syllabus', syllabusId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+  const topics = snap.data().topics || [];
+  const updated = topics.map(t => t.id === topicId ? { ...t, status } : t);
+  await updateDoc(ref, { topics: updated, updatedAt: serverTimestamp() });
+}
+
+// Handled by Admin controls above
+
+// ===================== SEEDING ENGINE =====================
+
+export async function seedInstitutionalData() {
+  const batch = writeBatch(db);
+
+  // 1. Platform Config
+  batch.set(doc(db, 'platformConfig', 'universal'), {
+    maintenanceBanner: 'Welcome to the new DYPIU Collab Platform. Professional Skill Matrix is now live.',
+    isMaintenanceMode: false,
+    updatedAt: serverTimestamp()
+  });
+
+  // 2. Placement Stats
+  batch.set(doc(db, 'placementStats', 'current'), {
+    totalPlaced: '450+',
+    avgPackage: '7.5 LPA',
+    topPackage: '44 LPA',
+    totalCompanies: '120+',
+    updatedAt: serverTimestamp()
+  });
+
+  // 3. Syllabus Skeleton (DBMS & AI)
+  const dbmsRef = doc(db, 'syllabus', 'dbms_sem4');
+  batch.set(dbmsRef, {
+    title: 'Database Management Systems',
+    priority: 1,
+    topics: [
+      { id: 't1', name: 'Relational Model & Algebraic Queries', status: 'completed' },
+      { id: 't2', name: 'Normalization (1NF, 2NF, 3NF, BCNF)', status: 'completed' },
+      { id: 't3', name: 'Indexing & Transaction Management', status: 'pending' },
+      { id: 't4', name: 'NoSQL & Distributed Databases', status: 'pending' }
+    ],
+    updatedAt: serverTimestamp()
+  });
+
+  const aiRef = doc(db, 'syllabus', 'ai_sem6');
+  batch.set(aiRef, {
+    title: 'Artificial Intelligence',
+    priority: 2,
+    topics: [
+      { id: 'a1', name: 'Probability Theory & Neural Networks', status: 'completed' },
+      { id: 'a2', name: 'NLP & Large Language Models', status: 'pending' }
+    ],
+    updatedAt: serverTimestamp()
+  });
+
+  await batch.commit();
+  return true;
+}

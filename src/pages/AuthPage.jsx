@@ -5,6 +5,7 @@ import { auth } from '../lib/firebase';
 import useAuthStore from '../store/authStore';
 import useNotificationStore from '../store/notificationStore';
 import Input from '../components/ui/Input';
+import { isValidDomain } from '../lib/rbac';
 
 import {
   Lock, Mail, User, GraduationCap, Briefcase, ArrowLeft,
@@ -24,54 +25,45 @@ export default function AuthPage() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [prn, setPrn] = useState('');
-  const [testRole, setTestRole] = useState('Student');
   const [isLoading, setIsLoading] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
 
   const { setUser } = useAuthStore();
   const { success, error } = useNotificationStore();
 
+  const ensureInstitutionEmail = () => {
+    if (!isValidDomain(email)) {
+      error('Use your DYPIU institutional email address.', 'Invalid Email Domain');
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     try {
       if (mode === 'login') {
+        if (!ensureInstitutionEmail()) return;
         const userProfile = await loginUser(email, password);
         if (userProfile) { setUser(userProfile); success('Welcome back!'); }
       } else if (mode === 'register') {
-        const finalPrn = testRole !== 'Student' ? `ROLE_${testRole}` : prn;
+        if (!ensureInstitutionEmail()) return;
         const profile = await registerUser({
           email, password, name,
-          prn: finalPrn.startsWith('ROLE_') ? '' : finalPrn,
-          role: finalPrn.startsWith('ROLE_') ? finalPrn.split('_')[1] : 'Student',
+          prn,
+          role: 'Student',
         });
         setUser(profile);
-        success('Account created!', 'Welcome to DYPIU Collab');
+        success('Account created. Verify your email to unlock workspace access.', 'Verification Needed');
       } else if (mode === 'forgot') {
         if (!email) { error('Enter your email address'); return; }
+        if (!ensureInstitutionEmail()) return;
         await sendPasswordResetEmail(auth, email);
         setForgotSent(true);
         success('Reset link sent! Check your inbox.', 'Email Sent');
       }
     } catch (err) {
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-        // If login fails, try to automatically register them so they don't have to switch tabs.
-        if (mode === 'login') {
-           try {
-              const finalPrn = testRole !== 'Student' ? `ROLE_${testRole}` : prn;
-              const profile = await registerUser({
-                email, password, name: email.split('@')[0],
-                prn: finalPrn.startsWith('ROLE_') ? '' : finalPrn,
-                role: finalPrn.startsWith('ROLE_') ? finalPrn.split('_')[1] : 'Student',
-              });
-              setUser(profile);
-              success('Auto-created account for testing!', 'Welcome to DYPIU Collab');
-              return;
-           } catch(autoRegisterErr) {
-              error(autoRegisterErr.message, 'Auto-Register Failed');
-           }
-        }
-      }
       error(err.message || 'Authentication failed', 'Auth Error');
     } finally {
       setIsLoading(false);
@@ -211,36 +203,19 @@ export default function AuthPage() {
                 {mode === 'register' && (
                   <div className="space-y-4 animate-fade-in">
                     <Input label="Full Legal Name" placeholder="e.g. Yash Marathe" leftIcon={User} value={name} onChange={(e) => setName(e.target.value)} required />
-                    <div className="grid grid-cols-2 gap-3">
-                      <Input label="PRN Number" placeholder="2021..." leftIcon={Briefcase} value={prn} onChange={(e) => setPrn(e.target.value)} />
-                      <div>
-                        <label className="block text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1.5">
-                          Dev Role
-                        </label>
-                        <select
-                          className="w-full h-11 px-3 bg-indigo-600/10 border border-indigo-500/30 rounded-xl text-indigo-300 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
-                          value={testRole}
-                          onChange={(e) => setTestRole(e.target.value)}
-                        >
-                          <option value="Student">Student (L1)</option>
-                          <option value="Faculty">Faculty (L2)</option>
-                          <option value="Admin">Admin (L3)</option>
-                          <option value="SuperAdmin">Super Admin (L4)</option>
-                        </select>
-                      </div>
-                    </div>
+                    <Input label="PRN Number" placeholder="2021..." leftIcon={Briefcase} value={prn} onChange={(e) => setPrn(e.target.value)} />
                   </div>
                 )}
 
                 <Input
                   label="University Email"
                   type="email"
-                  placeholder={mode === 'register' ? 'any@email.com' : 'your@email.com'}
+                  placeholder="name@dypiu.ac.in"
                   leftIcon={Mail}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  helperText={mode === 'register' ? 'Any email accepted (test mode)' : ''}
+                  helperText={'Allowed: @dypiu.ac.in or @dypiuinternational.ac.in'}
                 />
 
                 {mode !== 'forgot' && (

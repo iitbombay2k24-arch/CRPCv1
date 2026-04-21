@@ -8,6 +8,7 @@ import Badge from '../components/ui/Badge';
 import Avatar from '../components/ui/Avatar';
 import useNotificationStore from '../store/notificationStore';
 import useAuthStore from '../store/authStore';
+import { onChannelMessages, sendMessage } from '../services/firestoreService';
 
 const AMBIENT_SOUNDS = [
   { id: 'rain', name: 'Lofi Rain', track: 'Night Rain in Mumbai', icon: CloudRain, color: 'text-blue-400' },
@@ -26,11 +27,32 @@ export default function GroupStudyPage() {
   const { info } = useNotificationStore();
   const { user } = useAuthStore();
 
-  const handleSend = (e) => {
+  const ROOM_ID = 'group_study_main';
+
+  useEffect(() => {
+    const unsub = onChannelMessages(ROOM_ID, (data) => {
+      setMessages(data);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleSend = async (e) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
-    setMessages([...messages, { text: newMessage, sender: user?.name || 'You', time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }]);
+    if (!newMessage.trim() || !user) return;
+    const text = newMessage.trim();
     setNewMessage('');
+    try {
+      await sendMessage({
+        channelId: ROOM_ID,
+        text,
+        senderId: user.uid,
+        senderName: user.name,
+        senderRole: user.role,
+        type: 'channel'
+      });
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   useEffect(() => {
@@ -149,10 +171,10 @@ export default function GroupStudyPage() {
               </div>
             ) : (
               messages.map((m, i) => (
-                <div key={i} className="flex flex-col">
+                <div key={m.id || i} className="flex flex-col">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-bold text-indigo-400">{m.sender}</span>
-                    <span className="text-[9px] text-slate-600">{m.time}</span>
+                    <span className="text-xs font-bold text-indigo-400">{m.senderName}</span>
+                    <span className="text-[9px] text-slate-600">{m.time || 'now'}</span>
                   </div>
                   <p className="text-sm text-slate-300">{m.text}</p>
                 </div>

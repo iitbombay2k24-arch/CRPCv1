@@ -68,9 +68,39 @@ export const PERMISSIONS = {
   OVERRIDE_ALL: { minLevel: 4 },
 };
 
+export const TAB_PERMISSIONS = {
+  chat: 'VIEW_CHAT',
+  announcements: 'VIEW_ANNOUNCEMENTS',
+  timetable: 'VIEW_TIMETABLE',
+  attendance: 'VIEW_ATTENDANCE',
+  resources: 'VIEW_RESOURCES',
+  tasks: 'VIEW_TASKS',
+  qa: 'VIEW_QA',
+  grievances: 'SUBMIT_GRIEVANCE',
+  admin: 'VIEW_ADMIN',
+  dm: 'SEND_MESSAGE',
+  bookmarks: 'VIEW_BOOKMARKS',
+  profile: 'VIEW_CHAT',
+  quizzes: 'VIEW_CHAT',
+  placement: 'VIEW_CHAT',
+  leaderboard: 'VIEW_LEADERBOARD',
+  focus: 'VIEW_POMODORO',
+  'resume-analyzer': 'VIEW_CHAT',
+  'interview-forum': 'VIEW_CHAT',
+  'group-study': 'VIEW_CHAT',
+  blogs: 'VIEW_CHAT',
+  kiosk: 'VIEW_ADMIN'
+};
+
 export function hasPermission(role, permission) {
   const level = ROLE_LEVEL[role] || 1;
   return level >= (PERMISSIONS[permission]?.minLevel || 99);
+}
+
+export function canAccessTab(role, tabId) {
+  const permission = TAB_PERMISSIONS[tabId];
+  if (!permission) return false;
+  return hasPermission(role, permission);
 }
 
 export function getRoleBadge(role) {

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import {
   User, Settings, Shield, Mail, MapPin, Calendar, Camera, Save, LogOut,
-  Bell, Lock, Smartphone, Trophy, Activity, Award, Star, Edit2, Flame
+  Bell, Lock, Smartphone, Trophy, Activity, Award, Star, Edit2, Flame, QrCode as QrIcon, Zap
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import useAuthStore from '../store/authStore';
 import { logoutUser } from '../services/authService';
 import { uploadFile } from '../services/firestoreService';
@@ -26,6 +27,7 @@ export default function ProfilePage() {
   const { success, error } = useNotificationStore();
   const [isEditing, setIsEditing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [showSmartID, setShowSmartID] = useState(false);
   const [formData, setFormData] = useState({
     name: user?.name || '',
     division: user?.division || '',
@@ -70,12 +72,31 @@ export default function ProfilePage() {
     }
   };
 
+  const smartIdData = JSON.stringify({
+    uid: user?.uid,
+    name: user?.name,
+    prn: user?.prn,
+    div: user?.division,
+    role: user?.role
+  });
+
   return (
     <div className="h-full overflow-y-auto custom-scrollbar flex flex-col min-w-0">
       {/* Banner */}
       <div className="h-40 bg-gradient-to-r from-indigo-900/60 via-violet-900/40 to-slate-900 relative overflow-hidden shrink-0">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:40px_40px]" />
         <div className="absolute top-1/2 left-1/4 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -translate-y-1/2" />
+        <div className="absolute top-4 right-10">
+           <Button 
+            variant="primary" 
+            size="sm" 
+            icon={QrIcon} 
+            onClick={() => setShowSmartID(!showSmartID)}
+            className="shadow-2xl shadow-indigo-500/20"
+           >
+             {showSmartID ? 'Close Wallet' : 'Smart ID Card'}
+           </Button>
+        </div>
       </div>
 
       {/* Avatar overlapping banner */}
@@ -97,106 +118,185 @@ export default function ProfilePage() {
       <div className="px-10 pb-10 flex flex-col lg:flex-row gap-10">
         {/* Left */}
         <div className="flex-1 space-y-8">
-          {/* Status Picker */}
-          <div className="flex gap-2">
-            {['online', 'away', 'busy'].map(s => (
-              <button
-                key={s}
-                onClick={async () => {
-                  await updateUserStatus(user.uid, s);
-                  setUser({ ...user, status: s });
-                  success('Presence Updated', `Status changed to ${s}`);
-                }}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all
-                  ${user?.status === s 
-                    ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400' 
-                    : 'bg-white/[0.02] border-white/[0.05] text-slate-500 hover:text-slate-300'
-                  }`}
-              >
-                <div className={`w-1.5 h-1.5 rounded-full ${s === 'online' ? 'bg-emerald-500 shadow-[0_0_6px_#10b981]' : s === 'away' ? 'bg-amber-500 shadow-[0_0_6px_#f59e0b]' : 'bg-rose-500 shadow-[0_0_6px_#ef4444]'}`} />
-                {s}
-              </button>
-            ))}
-          </div>
-
-          {/* Name & Bio */}
-          <div>
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <h2 className="text-2xl font-black text-white tracking-tight">{user?.name}</h2>
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-0.5">
-                  Level {user?.roleLevel} · {user?.role}
-                </p>
-              </div>
+          {showSmartID ? (
+            <div className="glass-card p-10 rounded-[2.5rem] flex flex-col md:flex-row items-center gap-10 animate-in fade-in slide-in-from-top-4 duration-500 border-indigo-500/20 bg-indigo-500/5">
+                <div className="bg-white p-6 rounded-3xl shadow-2xl shadow-white/5 rotate-3 hover:rotate-0 transition-transform">
+                   <QRCodeSVG value={smartIdData} size={200} level="H" />
+                </div>
+                <div className="flex-1 text-center md:text-left">
+                   <h2 className="text-3xl font-black text-white mb-2 leading-none">Institutional Virtual ID</h2>
+                   <p className="text-indigo-400 font-bold uppercase text-[10px] tracking-widest mb-6">Secured Academic Profile</p>
+                   
+                   <div className="space-y-4">
+                      <div className="bg-black/40 border border-white/5 p-4 rounded-2xl">
+                         <p className="text-[10px] text-slate-500 font-black uppercase mb-1">Holder Name</p>
+                         <p className="text-lg font-bold text-white">{user?.name}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                         <div className="bg-black/40 border border-white/5 p-4 rounded-2xl">
+                            <p className="text-[10px] text-slate-500 font-black uppercase mb-1">PRN Number</p>
+                            <p className="font-bold text-white">{user?.prn || 'Pending'}</p>
+                         </div>
+                         <div className="bg-black/40 border border-white/5 p-4 rounded-2xl">
+                            <p className="text-[10px] text-slate-500 font-black uppercase mb-1">Institutional Div</p>
+                            <p className="font-bold text-white">{user?.division || 'NA'}</p>
+                         </div>
+                      </div>
+                   </div>
+                </div>
+            </div>
+          ) : (
+            <>
+              {/* Status Picker */}
               <div className="flex gap-2">
+                {['online', 'away', 'busy'].map(s => (
+                  <button
+                    key={s}
+                    onClick={async () => {
+                      await updateUserStatus(user.uid, s);
+                      setUser({ ...user, status: s });
+                      success('Presence Updated', `Status changed to ${s}`);
+                    }}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all
+                      ${user?.status === s 
+                        ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400' 
+                        : 'bg-white/[0.02] border-white/[0.05] text-slate-500 hover:text-slate-300'
+                      }`}
+                  >
+                    <div className={`w-1.5 h-1.5 rounded-full ${s === 'online' ? 'bg-emerald-500 shadow-[0_0_6px_#10b981]' : s === 'away' ? 'bg-amber-500 shadow-[0_0_6px_#f59e0b]' : 'bg-rose-500 shadow-[0_0_6px_#ef4444]'}`} />
+                    {s}
+                  </button>
+                ))}
+              </div>
+
+              {/* Name & Bio */}
+              <div>
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <h2 className="text-2xl font-black text-white tracking-tight">{user?.name}</h2>
+                    <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-0.5">
+                      Level {user?.roleLevel} · {user?.role}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    {isEditing ? (
+                      <>
+                        <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)}>Cancel</Button>
+                        <Button variant="primary" size="sm" icon={Save} onClick={handleSave}>Save</Button>
+                      </>
+                    ) : (
+                      <Button variant="secondary" size="sm" icon={Edit2} onClick={() => setIsEditing(true)}>
+                        Edit Profile
+                      </Button>
+                    )}
+                  </div>
+                </div>
                 {isEditing ? (
-                  <>
-                    <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)}>Cancel</Button>
-                    <Button variant="primary" size="sm" icon={Save} onClick={handleSave}>Save</Button>
-                  </>
+                  <textarea
+                    value={formData.bio}
+                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                    rows={3}
+                    className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl p-4 text-sm text-slate-300 focus:outline-none focus:border-indigo-500/40 resize-none"
+                  />
                 ) : (
-                  <Button variant="secondary" size="sm" icon={Edit2} onClick={() => setIsEditing(true)}>
-                    Edit Profile
-                  </Button>
+                  <p className="text-slate-400 text-sm leading-relaxed max-w-2xl">{user?.bio || formData.bio}</p>
                 )}
               </div>
-            </div>
-            {isEditing ? (
-              <textarea
-                value={formData.bio}
-                onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                rows={3}
-                className="w-full bg-white/[0.04] border border-white/[0.08] rounded-2xl p-4 text-sm text-slate-300 focus:outline-none focus:border-indigo-500/40 resize-none"
-              />
-            ) : (
-              <p className="text-slate-400 text-sm leading-relaxed max-w-2xl">{user?.bio || formData.bio}</p>
-            )}
-          </div>
 
-          {/* Academic & Security Info */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-white/[0.05] pt-7">
-            <div className="space-y-4">
-              <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Academic Context</h4>
-              {[
-                { icon: Shield,   label: 'Registration ID', value: user?.uid.slice(0, 10).toUpperCase() },
-                { icon: MapPin,   label: 'Division',        value: user?.division || 'Not Assigned' },
-                { icon: Calendar, label: 'Academic Year',   value: user?.year || 'Freshman' },
-              ].map((row) => (
-                <div key={row.label} className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-slate-500 shrink-0">
-                    <row.icon size={16} />
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest">{row.label}</p>
-                    <p className="text-sm font-bold text-slate-200">{row.value}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="space-y-4">
-              <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Security & Contact</h4>
-              {[
-                { icon: Mail,       label: 'Primary Email', value: user?.email },
-                { icon: Smartphone, label: '2FA / Device',  value: 'Enabled', badge: <Badge variant="success" size="xs">SECURE</Badge> },
-              ].map((row) => (
-                <div key={row.label} className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-slate-500 shrink-0">
-                    <row.icon size={16} />
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest">{row.label}</p>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-bold text-slate-200">{row.value}</p>
-                      {row.badge}
+              {/* Professional Skill Matrix - JUNO Inspired */}
+              <div className="glass-card rounded-3xl p-6 border-indigo-500/20 bg-indigo-500/5 mb-7">
+                 <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                       <div className="p-2.5 bg-indigo-500/20 rounded-xl text-indigo-400">
+                          <Zap size={20} />
+                       </div>
+                       <div>
+                          <h4 className="text-sm font-bold text-white">Professional Skill Matrix</h4>
+                          <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest">Institutional Compliance Pattern 2024</p>
+                       </div>
                     </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+                    <Badge variant="indigo" size="xs">Verified Asset</Badge>
+                 </div>
 
-          <div className="pt-4">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                       {[
+                         { label: 'Technical Core', value: 85, color: 'bg-indigo-500' },
+                         { label: 'Soft Skills (PS-I)', value: 92, color: 'bg-emerald-500' },
+                         { label: 'Corporate Ready (CAP)', value: 74, color: 'bg-amber-500' },
+                         { label: 'Institutional DMS', value: 88, color: 'bg-violet-500' }
+                       ].map(skill => (
+                         <div key={skill.label} className="space-y-1.5">
+                            <div className="flex justify-between items-center px-1">
+                               <span className="text-[10px] font-bold text-slate-400">{skill.label}</span>
+                               <span className="text-[10px] font-black text-white">{skill.value}%</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-white/[0.04] rounded-full overflow-hidden">
+                               <div className={`h-full ${skill.color} rounded-full transition-all duration-1000 shadow-[0_0_8px_rgba(99,102,241,0.3)]`} style={{ width: `${skill.value}%` }} />
+                            </div>
+                         </div>
+                       ))}
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5 content-start">
+                       {['DBMS Master', 'Agile/Scrum', 'Public Speaking', 'System Design', 'Cloud Infra', 'Ethics', 'Team Collab', 'Institutional Muster'].map(tag => (
+                         <span key={tag} className="px-3 py-1.5 bg-white/[0.03] border border-white/5 rounded-lg text-[9px] font-black uppercase text-slate-500 hover:text-white hover:border-indigo-500/30 transition-all cursor-default">
+                            {tag}
+                         </span>
+                       ))}
+                       <div className="w-full mt-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] text-center">
+                          <p className="text-[9px] text-indigo-400/80 font-bold">Sem 4: Earned "Section-A TOP-10" Skill Badge</p>
+                       </div>
+                    </div>
+                 </div>
+              </div>
+
+              {/* Academic & Security Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-white/[0.05] pt-7">
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Academic Context</h4>
+                  {[
+                    { icon: Shield,   label: 'Registration ID', value: user?.uid?.slice(0, 10).toUpperCase() },
+                    { icon: MapPin,   label: 'Division',        value: user?.division || 'Not Assigned' },
+                    { icon: Calendar, label: 'Academic Year',   value: user?.year || 'Freshman' },
+                  ].map((row) => (
+                    <div key={row.label} className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-slate-500 shrink-0">
+                        <row.icon size={16} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest">{row.label}</p>
+                        <p className="text-sm font-bold text-slate-200">{row.value}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Security & Contact</h4>
+                  {[
+                    { icon: Mail,       label: 'Primary Email', value: user?.email },
+                    { icon: Smartphone, label: '2FA / Device',  value: 'Enabled', badge: <Badge variant="success" size="xs">SECURE</Badge> },
+                  ].map((row) => (
+                    <div key={row.label} className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-center text-slate-500 shrink-0">
+                        <row.icon size={16} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest">{row.label}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-bold text-slate-200">{row.value}</p>
+                          {row.badge}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className="pt-4 border-t border-white/[0.05]">
             <Button variant="danger" icon={LogOut} onClick={handleLogout}>Log Out of System</Button>
           </div>
         </div>

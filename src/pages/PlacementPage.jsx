@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { onSnapshot, collection, query, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { applyToDrive } from '../services/firestoreService';
+import { applyToDrive, onPlacementStatsChange } from '../services/firestoreService';
 import useAuthStore from '../store/authStore';
 import useNotificationStore from '../store/notificationStore';
 import Button from '../components/ui/Button';
@@ -40,11 +40,13 @@ export default function PlacementPage() {
   const [activeView, setActiveView] = useState('Overview');
   const [realDrives, setRealDrives] = useState([]);
   const [isApplying, setIsApplying] = useState(null);
+  const [placementStats, setPlacementStats] = useState(null);
 
   useEffect(() => {
     const q = query(collection(db, 'placementDrives'), orderBy('createdAt', 'desc'));
-    const unsub = onSnapshot(q, (snap) => setRealDrives(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
-    return () => unsub();
+    const unsubDrives = onSnapshot(q, (snap) => setRealDrives(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+    const unsubStats = onPlacementStatsChange((data) => setPlacementStats(data));
+    return () => { unsubDrives(); unsubStats(); };
   }, []);
 
   const handleApply = async (drive) => {
@@ -80,6 +82,13 @@ export default function PlacementPage() {
     { company: 'TCS', role: 'Ninja / Digital', date: 'Next Week', package: '7.5 LPA', status: 'Open' },
   ];
 
+  const displayStats = placementStats ? [
+    { label: 'Total Placed', value: placementStats.totalPlaced || '0', icon: Users,     color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+    { label: 'Avg Package',  value: placementStats.avgPackage || '0 LPA', icon: DollarSign, color: 'text-indigo-400', bg: 'bg-indigo-500/10', border: 'border-indigo-500/20' },
+    { label: 'Top Package',  value: placementStats.topPackage || '0 LPA',  icon: TrendingUp, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+    { label: 'Companies',    value: placementStats.totalCompanies || '0',      icon: Building2,  color: 'text-rose-400',  bg: 'bg-rose-500/10',  border: 'border-rose-500/20' },
+  ] : STATS;
+
   return (
     <div className="h-full flex flex-col min-w-0 overflow-y-auto custom-scrollbar">
       {/* Header */}
@@ -114,7 +123,7 @@ export default function PlacementPage() {
       <div className="p-7 space-y-7 max-w-7xl mx-auto w-full">
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {STATS.map((s, i) => (
+          {displayStats.map((s, i) => (
             <div key={i} className={`glass-card rounded-2xl p-5 relative overflow-hidden group`}>
               <div className={`absolute -top-4 -right-4 w-16 h-16 ${s.bg} rounded-full opacity-30 group-hover:scale-150 transition-transform duration-700`} />
               <div className={`w-9 h-9 ${s.bg} border ${s.border} rounded-xl flex items-center justify-center ${s.color} mb-3`}>

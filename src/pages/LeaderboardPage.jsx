@@ -10,22 +10,49 @@ export default function LeaderboardPage() {
   const { user } = useAuthStore();
   const [activeSegment, setActiveSegment] = useState('Global');
   const [realLeaders, setRealLeaders] = useState([]);
+  const [divisionLeaders, setDivisionLeaders] = useState([]);
 
   useEffect(() => {
-    const q = query(collection(db, 'leaderboard'), orderBy('score', 'desc'), limit(20));
-    const unsub = onSnapshot(q, (snap) =>
-      setRealLeaders(snap.docs.map((d, i) => ({ rank: i + 1, id: d.id, ...d.data() })))
-    );
-    return () => unsub();
+    // Global/Individual Leaders
+    const qGlobal = query(collection(db, 'users'), orderBy('engagementScore', 'desc'), limit(20));
+    const unsubGlobal = onSnapshot(qGlobal, (snap) => {
+      setRealLeaders(snap.docs.map((d, i) => ({ 
+        rank: i + 1, 
+        id: d.id, 
+        score: d.data().engagementScore || 0,
+        ...d.data() 
+      })));
+    });
+
+    // Division Aggregation (House Cup)
+    const qDiv = query(collection(db, 'users'));
+    const unsubDivs = onSnapshot(qDiv, (snap) => {
+      const divMap = {};
+      snap.docs.forEach(doc => {
+        const d = doc.data();
+        const div = d.division || 'Unknown';
+        if (!divMap[div]) divMap[div] = 0;
+        divMap[div] += (d.engagementScore || 0);
+      });
+
+      const sortedDivs = Object.entries(divMap)
+        .map(([name, score]) => ({ name, score }))
+        .sort((a, b) => b.score - a.score)
+        .map((d, i) => ({ ...d, rank: i + 1, type: 'Division' }));
+      
+      setDivisionLeaders(sortedDivs);
+    });
+
+    return () => { unsubGlobal(); unsubDivs(); };
   }, []);
 
-  const leaders = realLeaders.length >= 3 ? realLeaders : [
-    { name: 'Aditya Verma',    score: 1420, rank: 1, trend: 'up',     division: 'Div A' },
-    { name: 'Sanya Gupta',     score: 1385, rank: 2, trend: 'stable', division: 'Div B' },
-    { name: 'Rahul Deshmukh',  score: 1340, rank: 3, trend: 'down',   division: 'Div A' },
-    { name: 'Priya Iyer',      score: 1290, rank: 4, trend: 'up',     division: 'Div C' },
-    { name: 'Ishaan Singh',    score: 1255, rank: 5, trend: 'up',     division: 'Div B' },
-  ];
+  const leaders = activeSegment === 'Division' ? divisionLeaders : (realLeaders.length > 0 ? realLeaders : [
+    { name: 'SHARVANI GHUGARE', score: 1420, rank: 1, trend: 'up',     division: 'Div A' },
+    { name: 'SWARAJ SHASTRI',   score: 1385, rank: 2, trend: 'stable', division: 'Div A' },
+    { name: 'RISHI KUMAR PANDA',score: 1340, rank: 3, trend: 'down',   division: 'Div A' },
+    { name: 'MISHTI GOEL',      score: 1290, rank: 4, trend: 'up',     division: 'Div A' },
+    { name: 'ADARSH RANJAN',    score: 1255, rank: 5, trend: 'up',     division: 'Div A' },
+  ]);
 
   const PODIUM = [
     { idx: 1, heightClass: 'h-72', ringColor: 'border-slate-400/40', topAccent: 'bg-slate-400', badge: 'text-slate-300', label: 'RANK #2' },
