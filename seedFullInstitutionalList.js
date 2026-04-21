@@ -707,56 +707,70 @@ const STUDENT_MASTER_LIST = [
 ];
 
 async function seed() {
-  console.log(`Starting massive institutional seed: ${STUDENT_MASTER_LIST.length} students...`);
+  console.log(`Starting institutional seed: ${STUDENT_MASTER_LIST.length} students...`);
   
   for (let i = 0; i < STUDENT_MASTER_LIST.length; i++) {
     const u = STUDENT_MASTER_LIST[i];
-    try {
-      console.log(`[${i+1}/${STUDENT_MASTER_LIST.length}] Creating Auth for ${u.email}...`);
-      
-      // Step 1: Create Auth Account
-      let res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: u.email, password: u.password, returnSecureToken: true })
-      });
-      let data = await res.json();
-      
-      let uid, idToken;
+    let success = false;
+    let attempts = 0;
+    const maxAttempts = 3;
 
-      if (data.error && data.error.message === 'EMAIL_EXISTS') {
-        // If already exists, login to update Firestore (ensures profile is fresh)
-        const loginRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${API_KEY}`, {
+    while (!success && attempts < maxAttempts) {
+      try {
+        console.log(`[${i+1}/${STUDENT_MASTER_LIST.length}] Processing ${u.email} (Attempt ${attempts + 1})...`);
+        
+        let res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${API_KEY}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: u.email, password: u.password, returnSecureToken: true })
         });
-        const loginData = await loginRes.json();
-        if (loginData.error) {
-            console.error(`Skipping ${u.email}: Already exists with different password.`);
-            continue;
+        let data = await res.json();
+        
+        let uid, idToken;
+
+        if (data.error && data.error.message === 'EMAIL_EXISTS') {
+          const loginRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: u.email, password: u.password, returnSecureToken: true })
+          });
+          const loginData = await loginRes.json();
+          if (loginData.error) {
+              console.log(`Skipping ${u.email}: Existing password mismatch.`);
+              success = true; // Skip
+              continue;
+          }
+          uid = loginData.localId;
+          idToken = loginData.idToken;
+        } else if (data.error && data.error.message === 'TOO_MANY_ATTEMPTS_TRY_LATER') {
+          console.warn(`Rate limit hit for ${u.email}. Backing off...`);
+          await new Promise(r => setTimeout(r, 5000 * (attempts + 1)));
+          attempts++;
+          continue;
+        } else if (data.error) {
+          console.error(`Auth Error for ${u.email}:`, data.error.message);
+          success = true; // Stop trying this one
+          continue;
+        } else {
+          uid = data.localId;
+          idToken = data.idToken;
         }
-        uid = loginData.localId;
-        idToken = loginData.idToken;
-      } else if (data.error) {
-        console.error(`Auth Error for ${u.email}:`, data.error.message);
-        continue;
-      } else {
-        uid = data.localId;
-        idToken = data.idToken;
+
+        await saveFullProfile(uid, u, idToken);
+        success = true;
+        
+      } catch (err) {
+        console.error(`Error for ${u.email}:`, err);
+        attempts++;
+        await new Promise(r => setTimeout(r, 2000));
       }
-
-      // Step 2: Save Dynamic Full Profile to Firestore
-      await saveFullProfile(uid, u, idToken);
-      
-      // Artificial delay to prevent massive spikes/limiters
-      if (i % 5 === 0) await new Promise(r => setTimeout(r, 200));
-
-    } catch (err) {
-      console.error(`Fatal error for ${u.email}:`, err);
     }
+    
+    // Regular delay between successful steps to be gentle on the API
+    const jitter = Math.floor(Math.random() * 800) + 200;
+    await new Promise(r => setTimeout(r, jitter));
   }
-  console.log('✓ Massive institutional seeding complete.');
+  console.log('✓ Institutional seeding complete.');
 }
 
 async function saveFullProfile(uid, u, idToken) {
