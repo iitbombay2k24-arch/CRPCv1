@@ -1,9 +1,7 @@
-/**
- * Derived from institutional records provided by university administration.
- * Used for registration validation, auto-profiling, and data seeding.
- */
+const API_KEY = 'AIzaSyDFCLrkYJghU0xdUvyGmTFfMxk7QoSLVsY';
+const PROJECT_ID = 'crpcv1-9959d';
 
-export const STUDENT_MASTER_LIST = [
+const STUDENT_MASTER_LIST = [
   { prn: "20240802001", name: "SHARVANI GURUSIDHA GHUGARE", div: "A", email: "20240802001@dypiu.ac.in", password: "test123" },
   { prn: "20240802002", name: "SWARAJ SACHIN SHASTRI", div: "A", email: "20240802002@dypiu.ac.in", password: "test123" },
   { prn: "20240802003", name: "RISHI KUMAR PANDA", div: "A", email: "20240802003@dypiu.ac.in", password: "test123" },
@@ -431,7 +429,7 @@ export const STUDENT_MASTER_LIST = [
   { prn: "20240802588", name: "VAISHNAV KISANRAO GAWTRE", div: "D", email: "20240802588@dypiu.ac.in", password: "test123" },
   { prn: "20240802590", name: "ANUJ NILESHRAV GUNDAWAR", div: "D", email: "20240802590@dypiu.ac.in", password: "test123" },
   { prn: "20240802592", name: "ANISH NITIN", div: "D", email: "20240802592@dypiu.ac.in", password: "test123" },
-  { prn: "20240802593", name: "SHRUTI RAJESH SONIMINDE", div: "D", email: "20240802593@dypiu.ac.in", password: "test123" },
+  { prn: "20240802593", name: "SHRUTI RAJHESH SONIMINDE", div: "D", email: "20240802593@dypiu.ac.in", password: "test123" },
   { prn: "20240802594", name: "RUSHAB RAMHARI PATIL", div: "D", email: "20240802594@dypiu.ac.in", password: "test123" },
   { prn: "20240802595", name: "ISHAN SANJAY KOLHE", div: "D", email: "20240802595@dypiu.ac.in", password: "test123" },
   { prn: "20240802596", name: "HARSHAL CHAUDHARI", div: "D", email: "20240802596@dypiu.ac.in", password: "test123" },
@@ -707,3 +705,103 @@ export const STUDENT_MASTER_LIST = [
   { prn: "20250812121", name: "ADITYA MADHUKAR KARKE", div: "F", email: "20250812121@dypiu.ac.in", password: "test123" },
   { prn: "20250812122", name: "AVISHKAR ANIL WALSE", div: "F", email: "20250812122@dypiu.ac.in", password: "test123" },
 ];
+
+async function seed() {
+  console.log(`Starting massive institutional seed: ${STUDENT_MASTER_LIST.length} students...`);
+  
+  for (let i = 0; i < STUDENT_MASTER_LIST.length; i++) {
+    const u = STUDENT_MASTER_LIST[i];
+    try {
+      console.log(`[${i+1}/${STUDENT_MASTER_LIST.length}] Creating Auth for ${u.email}...`);
+      
+      // Step 1: Create Auth Account
+      let res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: u.email, password: u.password, returnSecureToken: true })
+      });
+      let data = await res.json();
+      
+      let uid, idToken;
+
+      if (data.error && data.error.message === 'EMAIL_EXISTS') {
+        // If already exists, login to update Firestore (ensures profile is fresh)
+        const loginRes = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${API_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: u.email, password: u.password, returnSecureToken: true })
+        });
+        const loginData = await loginRes.json();
+        if (loginData.error) {
+            console.error(`Skipping ${u.email}: Already exists with different password.`);
+            continue;
+        }
+        uid = loginData.localId;
+        idToken = loginData.idToken;
+      } else if (data.error) {
+        console.error(`Auth Error for ${u.email}:`, data.error.message);
+        continue;
+      } else {
+        uid = data.localId;
+        idToken = data.idToken;
+      }
+
+      // Step 2: Save Dynamic Full Profile to Firestore
+      await saveFullProfile(uid, u, idToken);
+      
+      // Artificial delay to prevent massive spikes/limiters
+      if (i % 5 === 0) await new Promise(r => setTimeout(r, 200));
+
+    } catch (err) {
+      console.error(`Fatal error for ${u.email}:`, err);
+    }
+  }
+  console.log('✓ Massive institutional seeding complete.');
+}
+
+async function saveFullProfile(uid, u, idToken) {
+  const docUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/users/${uid}`;
+  
+  const fields = {
+    uid: { stringValue: uid },
+    email: { stringValue: u.email },
+    name: { stringValue: u.name },
+    prn: { stringValue: u.prn },
+    role: { stringValue: 'Student' },
+    roleLevel: { integerValue: 1 },
+    division: { stringValue: u.div || 'A' },
+    batch: { stringValue: '2024-2028' },
+    branch: { stringValue: 'Computer Engineering' },
+    cgpa: { doubleValue: 0.0 },
+    isActive: { booleanValue: true },
+    status: { stringValue: 'offline' },
+    avatar: { stringValue: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(u.name)}` },
+    engagementScore: { integerValue: 0 },
+    badgeList: { arrayValue: { values: [] } },
+    privacySettings: {
+      mapValue: {
+        fields: {
+          readReceiptsEnabled: { booleanValue: true },
+          onlineStatusVisible: { booleanValue: true },
+          profileVisibility: { stringValue: 'public' }
+        }
+      }
+    },
+    createdAt: { timestampValue: new Date().toISOString() },
+    lastSeen: { timestampValue: new Date().toISOString() }
+  };
+
+  const res = await fetch(docUrl, {
+    method: 'PATCH',
+    headers: { 
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${idToken}`
+    },
+    body: JSON.stringify({ fields })
+  });
+  
+  const data = await res.json();
+  if (data.error) console.error(`Firestore Error for ${u.email}:`, data.error);
+}
+
+seed();
