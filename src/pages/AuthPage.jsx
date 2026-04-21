@@ -33,42 +33,33 @@ export default function AuthPage() {
 
   const ensureInstitutionEmail = (inputEmail) => {
     if (!isValidDomain(inputEmail)) {
-      error('Use your DYPIU institutional email address or PRN.', 'Invalid Initial');
+      error('Use your DYPIU institutional email address.', 'Invalid Email Domain');
       return false;
     }
     return true;
-  };
-
-  const getFormattedEmail = (input) => {
-    const trimmed = input.trim().toLowerCase();
-    if (trimmed.includes('@')) return trimmed;
-    // Auto-append domain if they just entred PRN
-    return `${trimmed}@dypiu.ac.in`;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const authEmail = getFormattedEmail(email);
-      
       if (mode === 'login') {
-        if (!ensureInstitutionEmail(authEmail)) return;
-        const userProfile = await loginUser(authEmail, password);
+        if (!ensureInstitutionEmail(email)) return;
+        const userProfile = await loginUser(email, password);
         if (userProfile) { setUser(userProfile); success('Welcome back!'); }
       } else if (mode === 'register') {
-        if (!ensureInstitutionEmail(authEmail)) return;
+        if (!ensureInstitutionEmail(email)) return;
         const profile = await registerUser({
-          email: authEmail, password, name,
-          prn: prn || authEmail.split('@')[0],
+          email, password, name,
+          prn: prn || email.split('@')[0],
           role: 'Student',
         });
         setUser(profile);
         success('Account created. Verify your email to unlock workspace access.', 'Verification Needed');
       } else if (mode === 'forgot') {
-        if (!email) { error('Enter your email or PRN'); return; }
-        if (!ensureInstitutionEmail(authEmail)) return;
-        await sendPasswordResetEmail(auth, authEmail);
+        if (!email) { error('Enter your email address'); return; }
+        if (!ensureInstitutionEmail(email)) return;
+        await sendPasswordResetEmail(auth, email);
         setForgotSent(true);
         success('Reset link sent! Check your inbox.', 'Email Sent');
       }
@@ -217,14 +208,14 @@ export default function AuthPage() {
                 )}
 
                 <Input
-                  label="Email or PRN ID"
-                  type="text"
-                  placeholder="2021... or name@dypiu.ac.in"
+                  label="University Email"
+                  type="email"
+                  placeholder="name@dypiu.ac.in"
                   leftIcon={Mail}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  helperText={'Auto-resolves to @dypiu.ac.in'}
+                  helperText={'Allowed: @dypiu.ac.in or @dypiuinternational.ac.in'}
                 />
 
                 {mode !== 'forgot' && (
@@ -286,11 +277,11 @@ export default function AuthPage() {
                   <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl">
                     <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3">System Test Credentials</p>
                     <div className="text-xs text-slate-300 space-y-1.5 font-mono">
-                      <div className="flex justify-between"><span>[L1] Student:</span> <span className="text-white">student</span></div>
-                      <div className="flex justify-between"><span>[L2] Alumni:</span> <span className="text-white">alumni</span></div>
-                      <div className="flex justify-between"><span>[L3] Faculty:</span> <span className="text-white">faculty</span></div>
-                      <div className="flex justify-between"><span>[L4] Admin:</span> <span className="text-white">admin</span></div>
-                      <div className="flex justify-between"><span>[L5] SuperAdmin:</span> <span className="text-white">super</span></div>
+                      <div className="flex justify-between"><span>[L1] Student:</span> <span className="text-white">student@dypiu.ac.in</span></div>
+                      <div className="flex justify-between"><span>[L2] Alumni:</span> <span className="text-white">alumni@dypiu.ac.in</span></div>
+                      <div className="flex justify-between"><span>[L3] Faculty:</span> <span className="text-white">faculty@dypiu.ac.in</span></div>
+                      <div className="flex justify-between"><span>[L4] Admin:</span> <span className="text-white">admin@dypiu.ac.in</span></div>
+                      <div className="flex justify-between"><span>[L5] SuperAdmin:</span> <span className="text-white">super@dypiu.ac.in</span></div>
                     </div>
                     <div className="mt-3 pt-3 border-t border-indigo-500/20 text-center text-[10px] text-indigo-300">
                       Password for all: <strong className="text-white">123456</strong>
