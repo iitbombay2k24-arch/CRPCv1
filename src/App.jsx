@@ -68,10 +68,6 @@ export default function App() {
       setLoading(false);
     });
 
-    const unsubscribeConfig = onPlatformConfigChange((data) => {
-      setPlatformConfig(data);
-    });
-
     // Handle session end presence
     const handleUnload = () => {
       if (user?.uid) {
@@ -82,10 +78,18 @@ export default function App() {
 
     return () => {
       unsubscribe();
-      unsubscribeConfig();
       window.removeEventListener('beforeunload', handleUnload);
     };
   }, [setFirebaseUser, setUser, setLoading, user?.uid]);
+
+  // 1.5 Listen for Platform Config
+  useEffect(() => {
+    if (!user) return;
+    const unsubscribeConfig = onPlatformConfigChange((data) => {
+      setPlatformConfig(data);
+    });
+    return () => unsubscribeConfig();
+  }, [user]);
 
   // 2. Listen for Channel Changes (Real-time)
   useEffect(() => {
