@@ -7,25 +7,12 @@ import {
   collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc,
   query, where, orderBy, limit, onSnapshot, increment, serverTimestamp
 } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { db, storage } from '../lib/firebase';
 import { formatTimeAgo } from '../lib/utils';
 import { ROLE_LEVEL } from '../lib/rbac';
 
 // ===================== CHAT SERVICES =====================
-
-export async function sendMessage({ channelId, text, senderId, senderName, senderRole, type = 'channel' }) {
-  const collectionName = type === 'dm' ? 'dms' : 'channels';
-  const messageRef = collection(db, collectionName, channelId, 'messages');
-  
-  return await addDoc(messageRef, {
-    text,
-    senderId,
-    senderName,
-    senderRole,
-    createdAt: serverTimestamp(),
-    isRead: false
-  });
-}
 
 export function onChannelsChange(callback) {
   const q = query(collection(db, 'channels'), orderBy('name', 'asc'));
@@ -41,43 +28,8 @@ export async function createChannel(data) {
   });
 }
 
-export async function uploadFile(file, path) {
-  // Bridge to storageService
-  const { uploadMedia } = await import('./storageService');
-  return await uploadMedia(file, path);
-}
-
-export function onTypingStatusChange(channelId, callback) {
-  const q = query(collection(db, 'typing'), where('channelId', '==', channelId), where('isTyping', '==', true));
-  return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => d.data()));
-  });
-}
-
-export async function setTypingStatus(channelId, userId, isTyping) {
-  const id = `${channelId}_${userId}`;
-  await setDoc(doc(db, 'typing', id), {
-    channelId, userId, isTyping,
-    updatedAt: serverTimestamp()
-  }, { merge: true });
-}
-
 export function onChannelMessages(channelId, callback) {
   const q = query(collection(db, 'channels', channelId, 'messages'), orderBy('createdAt', 'asc'));
-  return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-  });
-}
-
-export function onThreadMessages(channelId, messageId, callback) {
-  const q = query(collection(db, 'channels', channelId, 'messages', messageId, 'threads'), orderBy('createdAt', 'asc'));
-  return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-  });
-}
-
-export function onDMMessages(dmId, callback) {
-  const q = query(collection(db, 'dms', dmId, 'messages'), orderBy('createdAt', 'asc'));
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
@@ -95,6 +47,13 @@ export function onThreadMessages(containerId, parentId, callback, isDM = false) 
       id: d.id, ...d.data(),
       timestamp: d.data().createdAt?.toDate() || new Date()
     })));
+  });
+}
+
+export function onDMMessages(dmId, callback) {
+  const q = query(collection(db, 'dms', dmId, 'messages'), orderBy('createdAt', 'asc'));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
 }
 
@@ -406,13 +365,7 @@ export async function updateUserStreak(uid) {
   }
 }
 
-export async function updateUserRole(uid, role, roleLevel) {
-  await updateDoc(doc(db, 'users', uid), {
-    role,
-    roleLevel,
-    updatedAt: serverTimestamp()
-  });
-}
+
 
 // ===================== TASK 9: VIRTUALIZATION & PAGINATION =====================
 
@@ -513,16 +466,6 @@ export function calculateAttendanceMetrics(attendanceList) {
 }
 
 
-// ===================== FILE UPLOAD =====================
-
-
-
-export async function uploadFile(file, contextPath) {
-  const storageRef = ref(storage, `${contextPath}/${Date.now()}_${file.name}`);
-  const uploadTask = await uploadBytesResumable(storageRef, file);
-  return await getDownloadURL(uploadTask.ref);
-}
-
 // ===================== TYPING INDICATORS =====================
 
 export function setTypingStatus(containerId, userId, isTyping) {
@@ -565,36 +508,6 @@ export function onDriveApplications(driveId, callback) {
   return onSnapshot(q, (snap) => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 }
 
-// ===================== USER STREAKS =====================
-
-export async function updateUserStreak(userId) {
-  const userRef = doc(db, 'users', userId);
-  const snap = await getDoc(userRef);
-  if (!snap.exists()) return;
-  
-  const data = snap.data();
-  const now = new Date();
-  const lastActive = data.lastActiveAt?.toDate() || new Date(0);
-  
-  // Diff in hours
-  const diff = (now - lastActive) / (1000 * 60 * 60);
-  
-  if (diff < 24) return; // Already active today
-  
-  if (diff < 48) {
-    // Streak continues
-    await updateDoc(userRef, {
-      streak: increment(1),
-      lastActiveAt: serverTimestamp()
-    });
-  } else {
-    // Streak reset
-    await updateDoc(userRef, {
-      streak: 1,
-      lastActiveAt: serverTimestamp()
-    });
-  }
-}
 
 // ===================== QR ATTENDANCE =====================
 
@@ -661,13 +574,6 @@ export async function globalSearch(searchTerm) {
 
 // ===================== GRIEVANCES =====================
 
-export async function updateGrievanceStatus(id, status, response) {
-  await updateDoc(doc(db, 'grievances', id), { 
-    status, 
-    adminResponse: response,
-    updatedAt: serverTimestamp()
-  });
-}
 
 // ===================== PIN MESSAGES =====================
 
@@ -717,18 +623,7 @@ export async function resolveQuestion(qId) {
   await updateDoc(doc(db, 'questions', qId), { isResolved: true });
 }
 
-// ===================== NOTIFICATIONS =====================
 
-export async function markNotificationAsRead(userId, notifId) {
-  await updateDoc(doc(db, 'users', userId, 'notifications', notifId), { isRead: true });
-}
-
-export async function clearAllNotifications(userId) {
-  const q = query(collection(db, 'users', userId, 'notifications'), where('isRead', '==', true));
-  const snap = await getDocs(q);
-  const batch = snap.docs.map(d => deleteDoc(d.ref));
-  await Promise.all(batch);
-}
 
 // (Duplicated Board Task functions removed)
 
@@ -776,17 +671,6 @@ export function onAuditLogChange(callback) {
 
 // ===================== INTERVIEW EXPERIENCES =====================
 
-export async function markDMAsRead(senderId, receiverId) {
-  const dmId = [senderId, receiverId].sort().join('_');
-  const q = query(
-    collection(db, 'dms', dmId, 'messages'), 
-    where('senderId', '==', receiverId),
-    where('isRead', '==', false)
-  );
-  const snap = await getDocs(q);
-  const batch = snap.docs.map(d => updateDoc(d.ref, { isRead: true, readAt: serverTimestamp() }));
-  await Promise.all(batch);
-}
 
 export async function postInterviewExperience({ company, role, fullText, tags, authorId, authorName }) {
   return await addDoc(collection(db, 'interviewExperiences'), {
@@ -882,4 +766,64 @@ export async function updateUserRole(targetUid, newRole) {
   await updateDoc(doc(db, 'users', targetUid), { role: newRole, roleLevel });
 }
 
+// ===================== FILE UPLOAD (Firebase Storage) =====================
 
+export async function uploadFile(file, contextPath) {
+  const storageRef = ref(storage, `${contextPath}/${Date.now()}_${file.name}`);
+  const uploadTask = await uploadBytesResumable(storageRef, file);
+  return await getDownloadURL(uploadTask.ref);
+}
+
+// ===================== NOTIFICATIONS =====================
+
+export function onNotificationsChange(userId, callback) {
+  if (!userId) return () => {};
+  const q = query(
+    collection(db, 'users', userId, 'notifications'),
+    orderBy('createdAt', 'desc'),
+    limit(30)
+  );
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+}
+
+// ===================== INTERVIEW EXPERIENCES =====================
+
+export function onInterviewExperiencesChange(callback) {
+  const q = query(collection(db, 'interviewExperiences'), orderBy('createdAt', 'desc'));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => ({
+      id: d.id, ...d.data(),
+      date: formatTimeAgo(d.data().createdAt?.toDate())
+    })));
+  });
+}
+
+// ===================== PLACEMENT DRIVES (Admin) =====================
+
+export async function createPlacementDrive(data) {
+  return await addDoc(collection(db, 'placementDrives'), {
+    ...data,
+    applicants: 0,
+    createdAt: serverTimestamp()
+  });
+}
+
+// ===================== SYLLABUS =====================
+
+export async function createSyllabusSubject(data) {
+  return await addDoc(collection(db, 'syllabus'), {
+    ...data,
+    createdAt: serverTimestamp()
+  });
+}
+
+// ===================== COURSE ARCHIVE =====================
+
+export async function createCourseArchive(data) {
+  return await addDoc(collection(db, 'courseArchive'), {
+    ...data,
+    createdAt: serverTimestamp()
+  });
+}
