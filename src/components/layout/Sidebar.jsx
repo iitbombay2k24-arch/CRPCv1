@@ -64,7 +64,7 @@ const NAV_SECTIONS = [
 ];
 
 export default function Sidebar() {
-  const { isSidebarOpen, activeTab, setActiveTab, setDmTarget } = useUIStore();
+  const { isSidebarOpen, activeTab, setActiveTab, setDmTarget, dmTarget } = useUIStore();
   const { channels, activeChannelId, selectChannel } = useChannelStore();
   const { user, setUser, setFirebaseUser } = useAuthStore();
   const [isModalOpen, setIsModalOpen] = useState(false);

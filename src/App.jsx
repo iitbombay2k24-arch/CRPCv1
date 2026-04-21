@@ -257,7 +257,7 @@ export default function App() {
             : activeTab.toLowerCase() === 'attendance' ? <AttendancePage />
             : activeTab.toLowerCase() === 'grievances' ? <GrievancePage />
             : activeTab.toLowerCase() === 'admin' ? <AdminPage />
-            : activeTab.toLowerCase() === 'dm' ? <DMPage targetId={dmTarget} />
+            : activeTab.toLowerCase() === 'dm' ? <DMPage />
             : activeTab.toLowerCase() === 'bookmarks' ? <BookmarksPage />
             : activeTab.toLowerCase() === 'profile' ? <ProfilePage />
             : activeTab.toLowerCase() === 'quizzes' ? <QuizPage />
