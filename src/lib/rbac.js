@@ -5,16 +5,18 @@
 
 export const ROLES = {
   STUDENT: 'Student',     // L1
-  FACULTY: 'Faculty',     // L2
-  ADMIN: 'Admin',         // L3
-  SUPERADMIN: 'SuperAdmin' // L4
+  ALUMNI: 'Alumni',       // L2
+  FACULTY: 'Faculty',     // L3
+  ADMIN: 'Admin',         // L4
+  SUPERADMIN: 'SuperAdmin' // L5
 };
 
 export const ROLE_LEVEL = {
   [ROLES.STUDENT]: 1,
-  [ROLES.FACULTY]: 2,
-  [ROLES.ADMIN]: 3,
-  [ROLES.SUPERADMIN]: 4
+  [ROLES.ALUMNI]: 2,
+  [ROLES.FACULTY]: 3,
+  [ROLES.ADMIN]: 4,
+  [ROLES.SUPERADMIN]: 5
 };
 
 export const PERMISSIONS = {
@@ -106,11 +108,13 @@ export function canAccessTab(role, tabId) {
 export function getRoleBadge(role) {
   switch (role) {
     case ROLES.SUPERADMIN:
-      return { label: 'Super Admin', color: 'bg-purple-600', level: 4 };
+      return { label: 'Super Admin', color: 'bg-purple-600', level: 5 };
     case ROLES.ADMIN:
-      return { label: 'Admin / HOD', color: 'bg-rose-500', level: 3 };
+      return { label: 'Admin / HOD', color: 'bg-rose-500', level: 4 };
     case ROLES.FACULTY:
-      return { label: 'Faculty', color: 'bg-amber-500', level: 2 };
+      return { label: 'Faculty', color: 'bg-amber-500', level: 3 };
+    case ROLES.ALUMNI:
+      return { label: 'Alumni Network', color: 'bg-sky-500', level: 2 };
     default:
       return { label: 'Student', color: 'bg-indigo-500', level: 1 };
   }

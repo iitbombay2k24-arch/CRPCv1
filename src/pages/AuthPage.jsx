@@ -31,35 +31,44 @@ export default function AuthPage() {
   const { setUser } = useAuthStore();
   const { success, error } = useNotificationStore();
 
-  const ensureInstitutionEmail = () => {
-    if (!isValidDomain(email)) {
-      error('Use your DYPIU institutional email address.', 'Invalid Email Domain');
+  const ensureInstitutionEmail = (inputEmail) => {
+    if (!isValidDomain(inputEmail)) {
+      error('Use your DYPIU institutional email address or PRN.', 'Invalid Initial');
       return false;
     }
     return true;
+  };
+
+  const getFormattedEmail = (input) => {
+    const trimmed = input.trim().toLowerCase();
+    if (trimmed.includes('@')) return trimmed;
+    // Auto-append domain if they just entred PRN
+    return `${trimmed}@dypiu.ac.in`;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     try {
+      const authEmail = getFormattedEmail(email);
+      
       if (mode === 'login') {
-        if (!ensureInstitutionEmail()) return;
-        const userProfile = await loginUser(email, password);
+        if (!ensureInstitutionEmail(authEmail)) return;
+        const userProfile = await loginUser(authEmail, password);
         if (userProfile) { setUser(userProfile); success('Welcome back!'); }
       } else if (mode === 'register') {
-        if (!ensureInstitutionEmail()) return;
+        if (!ensureInstitutionEmail(authEmail)) return;
         const profile = await registerUser({
-          email, password, name,
-          prn,
+          email: authEmail, password, name,
+          prn: prn || authEmail.split('@')[0],
           role: 'Student',
         });
         setUser(profile);
         success('Account created. Verify your email to unlock workspace access.', 'Verification Needed');
       } else if (mode === 'forgot') {
-        if (!email) { error('Enter your email address'); return; }
-        if (!ensureInstitutionEmail()) return;
-        await sendPasswordResetEmail(auth, email);
+        if (!email) { error('Enter your email or PRN'); return; }
+        if (!ensureInstitutionEmail(authEmail)) return;
+        await sendPasswordResetEmail(auth, authEmail);
         setForgotSent(true);
         success('Reset link sent! Check your inbox.', 'Email Sent');
       }
@@ -208,14 +217,14 @@ export default function AuthPage() {
                 )}
 
                 <Input
-                  label="University Email"
-                  type="email"
-                  placeholder="name@dypiu.ac.in"
+                  label="Email or PRN ID"
+                  type="text"
+                  placeholder="2021... or name@dypiu.ac.in"
                   leftIcon={Mail}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  helperText={'Allowed: @dypiu.ac.in or @dypiuinternational.ac.in'}
+                  helperText={'Auto-resolves to @dypiu.ac.in'}
                 />
 
                 {mode !== 'forgot' && (
@@ -273,10 +282,24 @@ export default function AuthPage() {
               </form>
 
               {mode === 'login' && (
-                <p className="text-center text-[10px] text-slate-600 mt-8 leading-relaxed">
-                  By signing in, you agree to DYPIU Collab{' '}
-                  <span className="text-indigo-500">Terms of Use</span> and confirm your institutional credentials.
-                </p>
+                <div className="mt-8 space-y-4">
+                  <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl">
+                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3">System Test Credentials</p>
+                    <div className="text-xs text-slate-300 space-y-1.5 font-mono">
+                      <div className="flex justify-between"><span>[L1] Student:</span> <span className="text-white">student</span></div>
+                      <div className="flex justify-between"><span>[L2] Alumni:</span> <span className="text-white">alumni</span></div>
+                      <div className="flex justify-between"><span>[L3] Faculty:</span> <span className="text-white">faculty</span></div>
+                      <div className="flex justify-between"><span>[L4] Admin:</span> <span className="text-white">admin</span></div>
+                      <div className="flex justify-between"><span>[L5] SuperAdmin:</span> <span className="text-white">super</span></div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-indigo-500/20 text-center text-[10px] text-indigo-300">
+                      Password for all: <strong className="text-white">123456</strong>
+                    </div>
+                  </div>
+                  <p className="text-center text-[10px] text-slate-600 leading-relaxed">
+                    By signing in, you agree to DYPIU Collab Terms and confirm your institutional credentials.
+                  </p>
+                </div>
               )}
             </div>
           )}
