@@ -9,6 +9,7 @@ import {
 import { onUsersChange } from '../../services/firestoreService';
 import { logoutUser } from '../../services/authService';
 import CreateChannelModal from '../../modals/CreateChannelModal';
+import UserSearchModal from '../../modals/UserSearchModal';
 
 import useUIStore from '../../store/uiStore';
 import useChannelStore from '../../store/channelStore';

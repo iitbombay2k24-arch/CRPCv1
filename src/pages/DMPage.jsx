@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Send, MessageSquare, ShieldCheck, Phone, Video,
-  MoreVertical, Bookmark, Check, CheckCheck
+  MoreVertical, Bookmark, Check, CheckCheck, Search
 } from 'lucide-react';
 import useAuthStore from '../store/authStore';
 import { sendMessage, onDMMessages, toggleBookmark, markDMAsRead } from '../services/firestoreService';
