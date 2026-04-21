@@ -10,7 +10,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "^1.50.1",
     "@tailwindcss/vite": "^4.2.2",
     "canvas-confetti": "^1.9.4",
     "firebase": "^12.12.0",

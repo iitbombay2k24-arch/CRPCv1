@@ -39,3 +39,6 @@ pnpm-debug.log*
 # Service account keys — CRITICAL: never commit
 serviceaccountkey.json
 *serviceaccount*.json
+
+# Nested repo clone — not a submodule, exclude entirely
+/CRPCv1/

@@ -6,7 +6,7 @@ import {
 import useAuthStore from '../store/authStore';
 import useChannelStore from '../store/channelStore';
 import { onChannelMessages, sendMessage, toggleBookmark, onTypingStatusChange, setTypingStatus, uploadFile } from '../services/firestoreService';
-import { formatTimeAgo, formatFileSize, scanDLP } from '../lib/utils';
+import { formatTimeAgo, formatFileSize } from '../lib/utils';
 import { getRoleBadge } from '../lib/rbac';
 import Avatar from '../components/ui/Avatar';
 import Badge from '../components/ui/Badge';
@@ -93,24 +93,6 @@ export default function ChatPage() {
     e.preventDefault();
     if (!newMessage.trim() || isSending) return;
     setIsSending(true);
-    const dlpResults = scanDLP(newMessage);
-    if (dlpResults.length > 0) {
-      const blockers = dlpResults.filter(r => r.severity === 'block');
-      if (blockers.length > 0) {
-        alert(`SECURITY WARNING: Your message was blocked due to sensitive data: ${blockers.map(b => b.name).join(', ')}`);
-        setIsSending(false);
-        return;
-      }
-      
-      const warnings = dlpResults.filter(r => r.severity === 'warn');
-      if (warnings.length > 0) {
-        if (!window.confirm(`SECURITY ADVISORY: Your message contains potentially sensitive information (${warnings.map(w => w.name).join(', ')}). Are you sure you want to proceed?`)) {
-          setIsSending(false);
-          return;
-        }
-      }
-    }
-
     try {
       await sendMessage({
         channelId: activeChannelId,

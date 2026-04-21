@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Menu, X, Bell, Search, MoreVertical, Hash,
-  Video, Phone, LayoutGrid, Clock
+  Video, Phone, LayoutGrid
 } from 'lucide-react';
 import useUIStore from '../../store/uiStore';
 import useChannelStore from '../../store/channelStore';
@@ -9,7 +9,7 @@ import useAuthStore from '../../store/authStore';
 import useNotificationStore from '../../store/notificationStore';
 import Badge from '../ui/Badge';
 import NotificationPanel from './NotificationPanel';
-import { onNotificationsChange, onTimetableChange } from '../../services/firestoreService';
+import { onNotificationsChange } from '../../services/firestoreService';
 
 const PAGE_TITLES = {
   chat: 'Channels',
@@ -40,29 +40,13 @@ export default function TopBar() {
 
   const channelInfo = activeChannel ? channelsData?.[activeChannel] : null;
 
-  const [nextClass, setNextClass] = useState(null);
-
   useEffect(() => {
     if (!user?.uid) return;
-    const unsubNotifs = onNotificationsChange(user.uid, (notifs) => {
+    const unsub = onNotificationsChange(user.uid, (notifs) => {
       setUnreadCount(notifs.filter((n) => !n.isRead).length);
     });
-
-    const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-    const nowStr = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-
-    const unsubTimetable = onTimetableChange(user.division || 'Division A', (slots) => {
-      const upcoming = slots
-        .filter(s => s.day === today && s.timeStart > nowStr)
-        .sort((a, b) => a.timeStart.localeCompare(b.timeStart))[0];
-      setNextClass(upcoming);
-    });
-
-    return () => {
-      unsubNotifs();
-      unsubTimetable();
-    };
-  }, [user?.uid, user?.division]);
+    return () => unsub();
+  }, [user?.uid]);
 
   const pageTitle = activeTab === 'chat' && activeChannel
     ? `# ${activeChannel}`
@@ -121,17 +105,15 @@ export default function TopBar() {
         </button>
 
         {/* Center: Next Class Bar */}
-        {nextClass && (
-          <div className="hidden xl:flex items-center gap-4 bg-white/[0.03] border border-white/[0.05] rounded-2xl px-4 py-1.5 hover:bg-white/[0.06] transition-all cursor-crosshair group">
-            <div className="w-8 h-8 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-400 group-hover:scale-110 transition-transform">
-                <Clock size={16} />
-            </div>
-            <div>
-                <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-0.5">Up Next</p>
-                <p className="text-[11px] font-bold text-slate-200">{nextClass.subject} <span className="text-slate-500 mx-1">/</span> <span className="text-orange-400">{nextClass.timeStart}</span></p>
-            </div>
-          </div>
-        )}
+        <div className="hidden xl:flex items-center gap-4 bg-white/[0.03] border border-white/[0.05] rounded-2xl px-4 py-1.5 hover:bg-white/[0.06] transition-all cursor-crosshair group">
+           <div className="w-8 h-8 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-400 group-hover:scale-110 transition-transform">
+              <Clock size={16} />
+           </div>
+           <div>
+              <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-0.5">Up Next</p>
+              <p className="text-[11px] font-bold text-slate-200">Cloud Computing <span className="text-slate-500 mx-1">/</span> <span className="text-orange-400">10:45 AM</span></p>
+           </div>
+        </div>
 
         <div className="flex items-center gap-1">
           {activeTab === 'chat' && activeChannel && (

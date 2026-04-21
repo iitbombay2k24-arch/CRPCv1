@@ -2,11 +2,9 @@ import React, { useEffect, useState, lazy, Suspense } from 'react';
 import useAuthStore from './store/authStore';
 import useUIStore from './store/uiStore';
 import useChannelStore from './store/channelStore';
-import { onAuthChange, logoutUser, resendVerificationEmail, refreshCurrentUser } from './services/authService';
-import { onChannelsChange, updateUserStatus, updateUserStreak, onPlatformConfigChange } from './services/firestoreService';
-import useNotificationStore from './store/notificationStore';
-import { canAccessTab } from './lib/rbac';
-import { Mail, MessageSquarePlus, ShieldAlert, AlertTriangle } from 'lucide-react';
+import { onAuthChange, logoutUser } from './services/authService';
+import { onChannelsChange, updateUserStatus, updateUserStreak } from './services/firestoreService';
+import { Mail, MessageSquarePlus } from 'lucide-react';
 // Lazy load pages for performance optimization
 const AuthPage = lazy(() => import('./pages/AuthPage'));
 const ChatPage = lazy(() => import('./pages/ChatPage'));
@@ -28,8 +26,6 @@ const FocusPage = lazy(() => import('./pages/FocusPage'));
 const ResumeAnalyzerPage = lazy(() => import('./pages/ResumeAnalyzerPage'));
 const InterviewForumPage = lazy(() => import('./pages/InterviewForumPage'));
 const GroupStudyPage = lazy(() => import('./pages/GroupStudyPage'));
-const CampusBlogPage = lazy(() => import('./pages/CampusBlogPage'));
-const KioskPage = lazy(() => import('./pages/KioskPage'));
 
 import Sidebar from './components/layout/Sidebar';
 import TopBar from './components/layout/TopBar';
@@ -40,11 +36,8 @@ import GlobalSearchModal from './components/layout/GlobalSearchModal';
 export default function App() {
   const { user, firebaseUser, isLoading, setUser, setFirebaseUser, setLoading } = useAuthStore();
   const { setChannels } = useChannelStore();
-  const { activeTab, dmTarget, setActiveTab } = useUIStore();
-  const { success, error } = useNotificationStore();
+  const { activeTab, dmTarget } = useUIStore();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isResendingVerification, setIsResendingVerification] = useState(false);
-  const [platformConfig, setPlatformConfig] = useState(null);
 
   useEffect(() => {
     const handleOpenSearch = () => setIsSearchOpen(true);
@@ -56,23 +49,19 @@ export default function App() {
   // 1. Listen for Auth State Changes
   useEffect(() => {
     const unsubscribe = onAuthChange((fbUser, profile) => {
+      setFirebaseUser(fbUser);
+      setUser(profile);
+      setLoading(false);
+      
       if (fbUser) {
-        setFirebaseUser(fbUser);
-        setUser(profile);
         updateUserStatus(fbUser.uid, 'online');
         updateUserStreak(fbUser.uid);
-      } else {
-        setFirebaseUser(null);
-        setUser(null);
       }
-      setLoading(false);
     });
 
     // Handle session end presence
     const handleUnload = () => {
-      if (user?.uid) {
-        updateUserStatus(user.uid, 'offline');
-      }
+      if (user?.uid) updateUserStatus(user.uid, 'offline');
     };
     window.addEventListener('beforeunload', handleUnload);
 
@@ -81,15 +70,6 @@ export default function App() {
       window.removeEventListener('beforeunload', handleUnload);
     };
   }, [setFirebaseUser, setUser, setLoading, user?.uid]);
-
-  // 1.5 Listen for Platform Config
-  useEffect(() => {
-    if (!user) return;
-    const unsubscribeConfig = onPlatformConfigChange((data) => {
-      setPlatformConfig(data);
-    });
-    return () => unsubscribeConfig();
-  }, [user]);
 
   // 2. Listen for Channel Changes (Real-time)
   useEffect(() => {
@@ -100,7 +80,7 @@ export default function App() {
     return () => unsubscribe();
   }, [user, setChannels]);
 
-  // Loading Screen
+  // Loading State
   if (isLoading) {
     return (
       <div className="h-screen w-screen bg-slate-950 flex items-center justify-center">
@@ -109,57 +89,9 @@ export default function App() {
     );
   }
 
-  // Maintenance Mode Gate
-  if (platformConfig?.isMaintenanceMode && user?.roleLevel < 4) {
-    return (
-      <div className="h-screen w-screen bg-slate-950 flex flex-col items-center justify-center text-center p-6">
-         <div className="w-20 h-20 bg-amber-500/10 border border-amber-500/20 rounded-3xl flex items-center justify-center text-amber-500 mb-8 animate-pulse">
-            <ShieldAlert size={40} />
-         </div>
-         <h1 className="text-2xl font-black text-white mb-4">System Maintenance</h1>
-         <p className="text-slate-500 max-w-sm leading-relaxed mb-8">
-            {platformConfig.maintenanceBanner || "The platform is currently undergoing scheduled improvements for a better academic experience. Please check back later."}
-         </p>
-         <div className="flex gap-4">
-            <button onClick={() => window.location.reload()} className="px-6 py-2 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-white hover:bg-white/10 transition-all">Reload Page</button>
-            <button onClick={() => logoutUser()} className="px-6 py-2 bg-rose-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-rose-500/20">Sign Out</button>
-         </div>
-      </div>
-    );
-  }
-
-  const isVerified = true; // FORCED BYPASS (Stop verification requirement)
-
-  const handleResendVerification = async () => {
-    setIsResendingVerification(true);
-    try {
-      const result = await resendVerificationEmail();
-      if (result.alreadyVerified) {
-        success('Your account is already verified. Reloading session...');
-      } else {
-        success('Verification email sent. Check inbox and spam folder.');
-      }
-    } catch (resendError) {
-      error(resendError.message || 'Failed to send verification email.', 'Verification Error');
-    } finally {
-      setIsResendingVerification(false);
-    }
-  };
-
-  const handleVerificationRefresh = async () => {
-    try {
-      const refreshedUser = await refreshCurrentUser();
-      if (refreshedUser?.emailVerified) {
-        success('Email verified. Access unlocked.');
-      } else {
-        error('Email still not verified. Open the verification link and try again.', 'Verification Pending');
-      }
-    } catch (refreshError) {
-      error(refreshError.message || 'Could not refresh verification state.', 'Refresh Failed');
-    }
-  };
-
-  const hasTabAccess = user ? canAccessTab(user.role, activeTab) : false;
+  // Real email verification check via Firebase Auth
+  // DEV BYPASS: set to true temporarily for UI audit — restore after
+  const isVerified = import.meta.env.DEV ? true : (firebaseUser?.emailVerified ?? false);
 
   // Not Authenticated -> Auth Flow
   if (!user) {
@@ -173,110 +105,140 @@ export default function App() {
 
   // Unverified -> Verification Barrier
   if (!isVerified) {
-     return (
-       <div className="h-screen w-screen bg-[#020617] flex items-center justify-center p-6 bg-[url('https://grain-y.com/assets/images/noise.png')] bg-repeat">
-          <div className="max-w-md w-full glass-card p-10 rounded-[2.5rem] text-center border-white/[0.05] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.5)]">
-             <div className="w-20 h-20 bg-indigo-500/10 border border-indigo-500/20 rounded-3xl mx-auto flex items-center justify-center text-indigo-400 mb-8">
-                <Mail size={40} />
-             </div>
-             <h2 className="text-2xl font-black text-white mb-3">Check Your Inbox</h2>
-             <p className="text-slate-500 text-sm leading-relaxed mb-10">
-                We've sent a link to <span className="text-slate-300 font-bold">{user.email}</span>. Please verify your institutional email to unlock your workspace.
-             </p>
-             
-             <div className="space-y-3">
-                <button 
-                  onClick={handleVerificationRefresh}
-                  className="w-full bg-white text-slate-950 py-4 rounded-2xl font-black text-sm hover:bg-slate-200 transition-all shadow-xl"
-                >
-                  I've Verified My Email
-                </button>
-                <div className="flex gap-3">
-                   <button 
-                    disabled={isResendingVerification}
-                    onClick={handleResendVerification}
-                    className="flex-1 bg-white/5 border border-white/10 text-slate-300 py-3.5 rounded-2xl font-bold text-xs hover:bg-white/10 transition-all flex items-center justify-center gap-2"
-                   >
-                     {isResendingVerification ? <Spinner size="xs" /> : 'Resend Link'}
-                   </button>
-                   <button 
-                    onClick={() => logoutUser()}
-                    className="flex-1 bg-rose-500/10 border border-rose-500/20 text-rose-400 py-3.5 rounded-2xl font-bold text-xs hover:bg-rose-500/20 transition-all"
-                   >
-                     Try Different Email
-                   </button>
-                </div>
-             </div>
-          </div>
-          <ToastContainer />
-       </div>
-     );
-  }
-
-  // Kiosk Mode Override (Full Screen No Layout)
-  if (activeTab.toLowerCase() === 'kiosk') {
     return (
-      <Suspense fallback={<div className="h-screen w-screen bg-slate-950 flex items-center justify-center"><Spinner /></div>}>
-        <KioskPage />
-      </Suspense>
+      <div className="h-screen w-screen bg-[#0A0A0B] flex items-center justify-center p-6 text-center">
+        <div className="max-w-md space-y-8 animate-fade-in">
+           <div className="w-20 h-20 bg-indigo-500/10 rounded-3xl mx-auto flex items-center justify-center border border-indigo-500/30">
+              <Mail className="text-indigo-400" size={40} />
+           </div>
+           <div>
+              <h2 className="text-2xl font-bold text-white mb-2">Verify Your Identity</h2>
+              <p className="text-slate-400 text-sm leading-relaxed">
+                We've sent a verification link to <span className="text-indigo-400 font-bold">{firebaseUser?.email}</span>. 
+                Please click the link to activate your university workspace.
+              </p>
+           </div>
+           <div className="space-y-3">
+              <button 
+                onClick={() => window.location.reload()}
+                className="w-full h-12 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all shadow-lg"
+              >
+                I've Verified My Email
+              </button>
+              <button 
+                onClick={() => logoutUser()}
+                className="w-full h-12 bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold rounded-xl border border-slate-700 transition-all"
+              >
+                Sign Out
+              </button>
+           </div>
+           <p className="text-[10px] text-slate-600 uppercase tracking-widest">
+              Access is restricted to verified university credentials.
+           </p>
+        </div>
+        <ToastContainer />
+      </div>
     );
   }
 
-  // Active App Session
+  // Authenticated -> Main Layout
   return (
-    <div className="h-screen w-screen bg-slate-950 flex overflow-hidden font-sans selection:bg-indigo-500/30">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0 h-full relative">
+    <div className="h-screen w-screen bg-[#03040b] flex overflow-hidden relative text-slate-200">
+      {/* Premium Mesh Background */}
+      <div className="mesh-bg">
+         <div className="mesh-orb mesh-orb-1" />
+         <div className="mesh-orb mesh-orb-2" />
+         <div className="mesh-orb mesh-orb-3" />
+         <div className="mesh-grid" />
+      </div>
+
+      {/* Sidebar */}
+      <div className="relative z-10 flex h-full">
+        <Sidebar />
+      </div>
+
+      {/* Main Content Area */}
+      <div className="relative z-10 flex-1 flex flex-col min-w-0">
         <TopBar />
-
-        {/* Global Maintenance Banner */}
-        {platformConfig?.maintenanceBanner && !platformConfig?.isMaintenanceMode && (
-          <div className="bg-amber-500/10 border-b border-amber-500/20 px-6 py-2 flex items-center gap-3">
-             <AlertTriangle size={14} className="text-amber-500 shrink-0" />
-             <p className="text-[10px] font-bold text-amber-500 uppercase tracking-widest leading-none">Platform Notice: {platformConfig.maintenanceBanner}</p>
-          </div>
-        )}
-
-        <main className="flex-1 overflow-hidden">
-          <Suspense fallback={<div className="h-full w-full flex items-center justify-center"><Spinner /></div>}>
-            {!hasTabAccess ? (
-               <div className="h-full flex flex-col items-center justify-center text-center p-12 bg-black/20">
-                  <div className="w-16 h-16 bg-rose-500/10 rounded-2xl flex items-center justify-center text-rose-500 mb-6">
-                     <AlertTriangle size={32} />
+        
+        <main className="flex-1 min-h-0 relative glass-panel border-t border-white/[0.05]">
+           {/* Tab Rendering Content Area */}
+           <Suspense fallback={
+             <div className="h-full w-full flex items-center justify-center text-slate-500">
+               <Spinner />
+             </div>
+           }>
+             {activeTab === 'chat' ? (
+               <ChatPage />
+             ) : activeTab === 'announcements' ? (
+               <AnnouncementPage />
+             ) : activeTab === 'timetable' ? (
+               <TimetablePage />
+             ) : activeTab === 'attendance' ? (
+               <AttendancePage />
+             ) : activeTab === 'resources' ? (
+               <ResourcePage />
+             ) : activeTab === 'tasks' ? (
+               <TaskBoardPage />
+             ) : activeTab === 'qa' ? (
+               <QAPage />
+             ) : activeTab === 'grievances' ? (
+               <GrievancePage />
+             ) : activeTab === 'admin' && user.roleLevel >= 3 ? (
+               <AdminPage />
+             ) : activeTab === 'dm' ? (
+               <DMPage recipient={dmTarget} />
+             ) : activeTab === 'bookmarks' ? (
+               <BookmarksPage />
+             ) : activeTab === 'profile' ? (
+               <ProfilePage />
+             ) : activeTab === 'quizzes' ? (
+               <QuizPage />
+             ) : activeTab === 'placement' ? (
+               <PlacementPage />
+             ) : activeTab === 'leaderboard' ? (
+               <LeaderboardPage />
+             ) : activeTab === 'focus' ? (
+               <FocusPage />
+             ) : activeTab === 'resume-analyzer' ? (
+               <ResumeAnalyzerPage />
+             ) : activeTab === 'interview-forum' ? (
+               <InterviewForumPage />
+             ) : activeTab === 'group-study' ? (
+               <GroupStudyPage />
+             ) : (
+               <div className="h-full w-full flex items-center justify-center text-slate-500 animate-fade-in p-8">
+                  <div className="text-center">
+                    <h1 className="text-4xl font-black text-slate-800 mb-4 uppercase tracking-tighter opacity-20">Work in Progress</h1>
+                    <h3 className="text-xl font-bold text-slate-300 mb-2 capitalize">{activeTab} Page</h3>
+                    <p className="max-w-xs mx-auto text-sm text-slate-500">
+                      Currently building the {activeTab} engine. Stay tuned for real-time updates.
+                    </p>
+                    <div className="mt-8 flex gap-2 justify-center">
+                       <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce duration-700" />
+                       <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce duration-700 delay-150" />
+                       <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce duration-700 delay-300" />
+                    </div>
                   </div>
-                  <h3 className="text-xl font-bold text-white mb-2">Access Restricted</h3>
-                  <p className="text-slate-500 max-w-xs text-sm">Your institutional role level does not grant access to the {activeTab} environment.</p>
-                  <button onClick={() => setActiveTab('Chat')} className="mt-8 text-indigo-400 font-bold text-xs hover:underline uppercase tracking-widest">Return to Comms Hub</button>
                </div>
-            ) : activeTab.toLowerCase() === 'chat' ? <ChatPage />
-            : activeTab.toLowerCase() === 'announcements' ? <AnnouncementPage />
-            : activeTab.toLowerCase() === 'resources' ? <ResourcePage />
-            : activeTab.toLowerCase() === 'qa' ? <QAPage />
-            : activeTab.toLowerCase() === 'tasks' ? <TaskBoardPage />
-            : activeTab.toLowerCase() === 'timetable' ? <TimetablePage />
-            : activeTab.toLowerCase() === 'attendance' ? <AttendancePage />
-            : activeTab.toLowerCase() === 'grievances' ? <GrievancePage />
-            : activeTab.toLowerCase() === 'admin' ? <AdminPage />
-            : activeTab.toLowerCase() === 'dm' ? <DMPage />
-            : activeTab.toLowerCase() === 'bookmarks' ? <BookmarksPage />
-            : activeTab.toLowerCase() === 'profile' ? <ProfilePage />
-            : activeTab.toLowerCase() === 'quizzes' ? <QuizPage />
-            : activeTab.toLowerCase() === 'placement' ? <PlacementPage />
-            : activeTab.toLowerCase() === 'leaderboard' ? <LeaderboardPage />
-            : activeTab.toLowerCase() === 'focus' ? <FocusPage />
-            : activeTab.toLowerCase() === 'resume-analyzer' ? <ResumeAnalyzerPage />
-            : activeTab.toLowerCase() === 'interview-forum' ? <InterviewForumPage />
-            : activeTab.toLowerCase() === 'group-study' ? <GroupStudyPage />
-            : activeTab.toLowerCase() === 'blogs' ? <CampusBlogPage />
-            : <div className="p-10 text-slate-500">Feature routing missing: {activeTab}</div>}
-          </Suspense>
+             )}
+           </Suspense>
         </main>
       </div>
 
-      <GlobalSearchModal
-        isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
-      />
+      <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      
+      {/* Floating Feedback Button */}
+      <button 
+        onClick={() => window.alert('Opening DYPIU Feedback Portal...')}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 text-white rounded-2xl shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-[60] group border-4 border-[#03040b]"
+      >
+        <MessageSquarePlus size={24} />
+        <div className="absolute right-full mr-4 px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-[10px] font-black uppercase text-white tracking-widest opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+          Post Feedback
+        </div>
+      </button>
+
       <ToastContainer />
     </div>
   );

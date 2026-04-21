@@ -20,74 +20,26 @@ export default function ResumeAnalyzerPage() {
     }
   };
 
-  const fileToGenerativePart = async (file) => {
-    const base64EncodedDataPromise = new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result.split(',')[1]);
-      reader.readAsDataURL(file);
-    });
-    return {
-      inlineData: { data: await base64EncodedDataPromise, mimeType: file.type }
-    };
-  };
-
-  const analyzeResume = async () => {
+  const analyzeResume = () => {
     if (!file) return;
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    
     setIsAnalyzing(true);
     
-    if (!apiKey) {
-      setTimeout(() => {
-        setResult({
-          score: 84,
-          match: 'Senior Software Engineer (Backend)',
-          streaks: ['React', 'Node.js', 'Firebase', 'Data Structures'],
-          weaknesses: ['SQL Optimization', 'Cloud Scalability'],
-          summary: 'MOCK DATA (No API Key found): Strong foundational skills with high consistency in frontend and real-time backend development.'
-        });
-        setIsAnalyzing(false);
-        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-      }, 1500);
-      return;
-    }
-
-    try {
-      const pdfPart = await fileToGenerativePart(file);
-      const prompt = `You are an expert tech recruiter and ATS system. Analyze this resume file. 
-      Return ONLY a valid JSON object (no markdown, no backticks). The JSON must exactly match this structure:
-      {
-        "score": (a number between 1 and 100 matching overall quality and ATS readability),
-        "match": (The best suitable job title for this resume, string),
-        "summary": (A 2-sentence summary of the candidate's career profile),
-        "streaks": [Array of 3 to 5 core strengths or skills found],
-        "weaknesses": [Array of 2 to 3 skill gaps or weaknesses]
-      }`;
-
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }, pdfPart] }],
-          generationConfig: { responseMimeType: "application/json" }
-        })
+    // Simulate AI analysis
+    setTimeout(() => {
+      setResult({
+        score: 84,
+        match: 'Senior Software Engineer (Backend)',
+        streaks: ['React', 'Node.js', 'Firebase', 'Data Structures'],
+        weaknesses: ['SQL Optimization', 'Cloud Scalability'],
+        summary: 'Strong foundational skills with high consistency in frontend and real-time backend development. Recommended to improve theoretical OS and SQL concepts.'
       });
-
-      const data = await response.json();
-      if (data.error) throw new Error(data.error.message);
-
-      const aiText = data.candidates[0].content.parts[0].text;
-      const parsedResult = JSON.parse(aiText);
-      
-      setResult(parsedResult);
-      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-    } catch (err) {
-      console.error("Gemini Analysis Error:", err);
-      // Fallback if parsing or network fails
-      alert("Analysis failed. Make sure it's a valid PDF and your API key is correct.");
-    } finally {
       setIsAnalyzing(false);
-    }
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 }
+      });
+    }, 3000);
   };
 
   return (

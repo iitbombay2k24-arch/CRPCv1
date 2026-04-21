@@ -9,12 +9,10 @@ import {
 import { onUsersChange } from '../../services/firestoreService';
 import { logoutUser } from '../../services/authService';
 import CreateChannelModal from '../../modals/CreateChannelModal';
-import UserSearchModal from '../../modals/UserSearchModal';
 
 import useUIStore from '../../store/uiStore';
 import useChannelStore from '../../store/channelStore';
 import useAuthStore from '../../store/authStore';
-import { canAccessTab, hasPermission } from '../../lib/rbac';
 import Avatar from '../ui/Avatar';
 import Badge from '../ui/Badge';
 
@@ -58,28 +56,23 @@ const NAV_SECTIONS = [
     items: [
       { id: 'grievances', label: 'Grievances', icon: ShieldAlert, color: 'text-rose-400' },
       { id: 'group-study', label: 'Study Rooms', icon: Users, color: 'text-emerald-400' },
-      { id: 'blogs', label: 'Campus Blogs', icon: Sparkles, color: 'text-amber-400' },
     ],
   },
 ];
 
 export default function Sidebar() {
-  const { isSidebarOpen, activeTab, setActiveTab, setDmTarget, dmTarget } = useUIStore();
+  const { isSidebarOpen, activeTab, setActiveTab, setDmTarget } = useUIStore();
   const { channels, activeChannelId, selectChannel } = useChannelStore();
   const { user, setUser, setFirebaseUser } = useAuthStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [realUsers, setRealUsers] = useState([]);
   const [collapsedSections, setCollapsedSections] = useState({});
   const [showDMs, setShowDMs] = useState(true);
 
-  const currentRole = user?.role;
-  const isAdmin = canAccessTab(currentRole, 'admin');
-  const canCreateChannel = hasPermission(currentRole, 'CREATE_CHANNEL');
+  const isAdmin = user?.roleLevel >= 3;
 
   useEffect(() => {
     const unsub = onUsersChange((data) => {
-      // We only show a few recent or pinned users if needed, but primary is search
       setRealUsers(data.filter((u) => u.uid !== user?.uid));
     });
     return () => unsub();
@@ -141,8 +134,6 @@ export default function Sidebar() {
       <div className="flex-1 overflow-y-auto custom-scrollbar py-3 px-2 space-y-0.5">
         {NAV_SECTIONS.map((section) => (
           <div key={section.title} className="mb-1">
-            {section.items.some((item) => canAccessTab(currentRole, item.id)) && (
-              <>
             <button
               onClick={() => toggleSection(section.title)}
               className="
@@ -161,7 +152,7 @@ export default function Sidebar() {
 
             {!collapsedSections[section.title] && (
               <div className="space-y-0.5 mt-0.5">
-                {section.items.filter((item) => canAccessTab(currentRole, item.id)).map((item) => {
+                {section.items.map((item) => {
                   const isActive = activeTab === item.id;
                   return (
                     <button
@@ -188,8 +179,6 @@ export default function Sidebar() {
                   );
                 })}
               </div>
-            )}
-              </>
             )}
           </div>
         ))}
@@ -229,7 +218,6 @@ export default function Sidebar() {
               </h3>
               <button
                 onClick={() => setIsModalOpen(true)}
-                disabled={!canCreateChannel}
                 className="p-1 rounded-lg text-slate-600 hover:text-white hover:bg-white/8 transition-all"
               >
                 <Plus size={12} />
@@ -258,46 +246,36 @@ export default function Sidebar() {
 
         {/* Direct Messages */}
         <div className="mt-3 pt-3 border-t border-white/[0.04]">
-          <div className="flex items-center justify-between px-3 mb-2">
+          <button
+            onClick={() => setShowDMs(!showDMs)}
+            className="w-full flex items-center justify-between px-3 mb-2"
+          >
             <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-[0.15em] flex items-center gap-1.5">
               <Users size={9} /> Direct Messages
             </h3>
-            <button 
-              onClick={() => setIsSearchOpen(true)}
-              className="p-1 rounded-lg text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 transition-all flex items-center gap-1.5"
-            >
-              <Plus size={11} />
-              <span className="text-[10px] font-black uppercase tracking-tighter">New Message</span>
-            </button>
-          </div>
+            <ChevronDown size={9} className={`text-slate-600 transition-transform duration-200 ${showDMs ? '' : '-rotate-90'}`} />
+          </button>
 
-          <div className="space-y-0.5 max-h-[200px] overflow-y-auto custom-scrollbar-slim px-1">
-            {/* Show only top 5 recent/online users to keep list clean */}
-            {realUsers.slice(0, 5).map((u) => (
-              <button
-                key={u.uid}
-                onClick={() => handleDMClick(u)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] transition-all
-                  ${activeTab === 'dm' && dmTarget?.uid === u.uid 
-                    ? 'bg-indigo-500/10 text-white font-medium border border-indigo-500/20' 
-                    : 'text-slate-500 hover:bg-white/4 hover:text-slate-200'}`}
-              >
-                <Avatar name={u.name} size="xs" status={u.status} />
-                <span className="truncate flex-1 text-left">{u.name}</span>
-                {u.status === 'online' && (
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 shadow-[0_0_6px_rgba(52,211,153,0.7)]" />
-                )}
-              </button>
-            ))}
-            {realUsers.length > 5 && (
-               <button 
-                onClick={() => setIsSearchOpen(true)}
-                className="w-full py-2 text-[10px] text-slate-600 font-bold uppercase tracking-widest hover:text-indigo-400 transition-colors"
-               >
-                 + Search All Users
-               </button>
-            )}
-          </div>
+          {showDMs && (
+            <div className="space-y-0.5">
+              {realUsers.slice(0, 8).map((u) => (
+                <button
+                  key={u.uid}
+                  onClick={() => handleDMClick(u)}
+                  className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-[13px] text-slate-400 hover:bg-white/4 hover:text-slate-200 transition-all"
+                >
+                  <Avatar name={u.name} size="xs" status={u.status} />
+                  <span className="truncate">{u.name}</span>
+                  {u.status === 'online' && (
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-auto shrink-0 shadow-[0_0_6px_rgba(52,211,153,0.7)]" />
+                  )}
+                </button>
+              ))}
+              {realUsers.length > 8 && (
+                <p className="text-[10px] text-slate-600 px-3 py-1">+{realUsers.length - 8} more</p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -334,11 +312,6 @@ export default function Sidebar() {
       </div>
 
       <CreateChannelModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-      <UserSearchModal 
-        isOpen={isSearchOpen} 
-        onClose={() => setIsSearchOpen(false)} 
-        onSelect={(u) => handleDMClick(u)} 
-      />
     </aside>
   );
 }

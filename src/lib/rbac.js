@@ -5,18 +5,16 @@
 
 export const ROLES = {
   STUDENT: 'Student',     // L1
-  ALUMNI: 'Alumni',       // L2
-  FACULTY: 'Faculty',     // L3
-  ADMIN: 'Admin',         // L4
-  SUPERADMIN: 'SuperAdmin' // L5
+  FACULTY: 'Faculty',     // L2
+  ADMIN: 'Admin',         // L3
+  SUPERADMIN: 'SuperAdmin' // L4
 };
 
 export const ROLE_LEVEL = {
   [ROLES.STUDENT]: 1,
-  [ROLES.ALUMNI]: 2,
-  [ROLES.FACULTY]: 3,
-  [ROLES.ADMIN]: 4,
-  [ROLES.SUPERADMIN]: 5
+  [ROLES.FACULTY]: 2,
+  [ROLES.ADMIN]: 3,
+  [ROLES.SUPERADMIN]: 4
 };
 
 export const PERMISSIONS = {
@@ -70,51 +68,19 @@ export const PERMISSIONS = {
   OVERRIDE_ALL: { minLevel: 4 },
 };
 
-export const TAB_PERMISSIONS = {
-  chat: 'VIEW_CHAT',
-  announcements: 'VIEW_ANNOUNCEMENTS',
-  timetable: 'VIEW_TIMETABLE',
-  attendance: 'VIEW_ATTENDANCE',
-  resources: 'VIEW_RESOURCES',
-  tasks: 'VIEW_TASKS',
-  qa: 'VIEW_QA',
-  grievances: 'SUBMIT_GRIEVANCE',
-  admin: 'VIEW_ADMIN',
-  dm: 'SEND_MESSAGE',
-  bookmarks: 'VIEW_BOOKMARKS',
-  profile: 'VIEW_CHAT',
-  quizzes: 'VIEW_CHAT',
-  placement: 'VIEW_CHAT',
-  leaderboard: 'VIEW_LEADERBOARD',
-  focus: 'VIEW_POMODORO',
-  'resume-analyzer': 'VIEW_CHAT',
-  'interview-forum': 'VIEW_CHAT',
-  'group-study': 'VIEW_CHAT',
-  blogs: 'VIEW_CHAT',
-  kiosk: 'VIEW_ADMIN'
-};
-
 export function hasPermission(role, permission) {
   const level = ROLE_LEVEL[role] || 1;
   return level >= (PERMISSIONS[permission]?.minLevel || 99);
 }
 
-export function canAccessTab(role, tabId) {
-  const permission = TAB_PERMISSIONS[tabId];
-  if (!permission) return false;
-  return hasPermission(role, permission);
-}
-
 export function getRoleBadge(role) {
   switch (role) {
     case ROLES.SUPERADMIN:
-      return { label: 'Super Admin', color: 'bg-purple-600', level: 5 };
+      return { label: 'Super Admin', color: 'bg-purple-600', level: 4 };
     case ROLES.ADMIN:
-      return { label: 'Admin / HOD', color: 'bg-rose-500', level: 4 };
+      return { label: 'Admin / HOD', color: 'bg-rose-500', level: 3 };
     case ROLES.FACULTY:
-      return { label: 'Faculty', color: 'bg-amber-500', level: 3 };
-    case ROLES.ALUMNI:
-      return { label: 'Alumni Network', color: 'bg-sky-500', level: 2 };
+      return { label: 'Faculty', color: 'bg-amber-500', level: 2 };
     default:
       return { label: 'Student', color: 'bg-indigo-500', level: 1 };
   }

@@ -5,12 +5,12 @@
 
 import {
   collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc,
-  query, where, orderBy, limit, onSnapshot, increment, serverTimestamp, writeBatch
+  query, where, orderBy, limit, onSnapshot, increment, serverTimestamp
 } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../lib/firebase';
 import { formatTimeAgo } from '../lib/utils';
-import { STUDENT_MASTER_LIST } from '../lib/studentData';
+import { ROLE_LEVEL } from '../lib/rbac';
 
 // ===================== CHANNELS =====================
 
@@ -91,11 +91,15 @@ export function onThreadMessages(containerId, parentId, callback, isDM = false) 
   });
 }
 
-export async function sendMessage({ channelId, text, senderId, senderName, senderEmail, senderRole, type, parentId, files }) {
+export async function sendMessage({ channelId, text, senderId, senderName, senderEmail, senderRole, type, parentId, files, participants }) {
   let collPath;
   if (type === 'dm') {
     const dmId = channelId; // For DMs, channelId is the combinedId
     collPath = `dms/${dmId}/messages`;
+    // Ensure parent DM doc exists with participants array (required by Firestore rules)
+    if (participants && participants.length === 2) {
+      await setDoc(doc(db, 'dms', dmId), { participants }, { merge: true });
+    }
   } else {
     collPath = `channels/${channelId}/messages`;
   }
@@ -248,7 +252,11 @@ export async function createQuestion({ title, body, tags, authorId, authorName }
 
 export function onBoardTasksChange(contextData, callback) {
   if (!contextData) return () => {};
-  const q = query(collection(db, 'boardTasks'), where('year', '==', contextData.year || 'General'));
+  const q = query(
+    collection(db, 'boardTasks'), 
+    where('year', '==', contextData.year || 'General'),
+    orderBy('createdAt', 'desc')
+  );
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
@@ -338,18 +346,15 @@ export function onQuizzesChange(callback) {
   });
 }
 
-export async function submitQuizResult(quizId, resultData) {
-  const { userId, userName, score, total, answers, timeTaken } = resultData || {};
+export async function submitQuizResult({ quizId, studentId, studentName, score, total }) {
   return await addDoc(collection(db, 'quizzes', quizId, 'results'), {
-    studentId: userId, studentName: userName, score, total,
-    answers: answers || {},
-    timeTaken: timeTaken || 0,
-    submittedAt: serverTimestamp()
+    studentId, studentName, score, total, submittedAt: serverTimestamp()
   });
 }
 
 export function onQuizSubmissions(quizId, callback) {
-  const q = query(collection(db, 'quizzes', quizId, 'submissions'), orderBy('score', 'desc'));
+  // Reads from 'results' to match submitQuizResult which writes to 'results'
+  const q = query(collection(db, 'quizzes', quizId, 'results'), orderBy('score', 'desc'));
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
@@ -361,56 +366,6 @@ export function onUsersChange(callback) {
   return onSnapshot(collection(db, 'users'), (snap) => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
-}
-
-/**
- * Searches users by PRN, Name, or Email.
- * Performs parallel queries for exact/prefix matches and merges results.
- */
-export async function searchUsers(searchTerm) {
-  if (!searchTerm || searchTerm.length < 2) return [];
-  
-  const term = searchTerm.toLowerCase().trim();
-  const usersRef = collection(db, 'users');
-  
-  // Note: Firestore doesn't support native OR queries across different fields easily 
-  // with partial matches without specialized indexing. 
-  // We'll perform a few targeted queries and merge.
-  
-  const queries = [
-    // Exact or prefix match for PRN
-    query(usersRef, where('prn', '==', term)),
-    // Exact match for Email
-    query(usersRef, where('email', '==', term)),
-    // For Name, we can do a range query if we have a searchableName field, 
-    // or we fetch a reasonable batch and filter.
-    // Given 700 users, fetching all names might be OK, but let's try to be smarter.
-    query(usersRef, limit(100)) 
-  ];
-
-  try {
-    const snapshots = await Promise.all(queries.map(q => getDocs(q)));
-    const resultsMap = new Map();
-
-    snapshots.forEach(snap => {
-      snap.forEach(doc => {
-        const data = doc.data();
-        const matches = 
-          data.name?.toLowerCase().includes(term) || 
-          data.prn?.toLowerCase().includes(term) || 
-          data.email?.toLowerCase().includes(term);
-          
-        if (matches) {
-          resultsMap.set(doc.id, { uid: doc.id, ...data });
-        }
-      });
-    });
-
-    return Array.from(resultsMap.values());
-  } catch (err) {
-    console.error('User search failed:', err);
-    return [];
-  }
 }
 
 export async function updateUserStatus(uid, status) {
@@ -464,98 +419,6 @@ export function onGlobalStatsChange(callback) {
     return unsubChannels;
   });
   return unsubUsers;
-}
-
-export function onPlacementStatsChange(callback) {
-  return onSnapshot(doc(db, 'platformStats', 'placement'), (docSnap) => {
-    if (docSnap.exists()) {
-      callback(docSnap.data());
-    } else {
-      callback(null);
-    }
-  });
-}
-
-export async function updatePlacementStats(stats) {
-  const statsRef = doc(db, 'platformStats', 'placement');
-  await setDoc(statsRef, {
-    ...stats,
-    updatedAt: serverTimestamp()
-  }, { merge: true });
-}
-
-export async function createPlacementDrive(drive) {
-  return await addDoc(collection(db, 'placementDrives'), {
-    ...drive,
-    createdAt: serverTimestamp()
-  });
-}
-
-// ===================== USER MANAGEMENT =====================
-
-export async function updateUserRole(uid, role, level) {
-  await updateDoc(doc(db, 'users', uid), {
-    role,
-    roleLevel: level,
-    updatedAt: serverTimestamp()
-  });
-}
-
-export async function bulkSyncStudents() {
-  const batchLimit = 500; // Firestore batch limit
-  let count = 0;
-  
-  // Note: For 700+ users, we should ideally use multiple batches
-  // But for this institutional startup, we'll do an optimized loop
-  for (const student of STUDENT_MASTER_LIST) {
-    const studentId = `ghost-${student.prn}`;
-    const userRef = doc(db, 'users', studentId);
-    
-    // Check if exists
-    const snap = await getDoc(userRef);
-    if (!snap.exists()) {
-      await setDoc(userRef, {
-        name: student.name,
-        prn: student.prn,
-        division: `Division ${student.div}`,
-        role: 'Student',
-        roleLevel: 1,
-        isGhost: true, // Marker for pre-registered users
-        engagementScore: 0,
-        createdAt: serverTimestamp()
-      });
-      count++;
-    }
-  }
-  return count;
-}
-
-// ===================== SYSTEM CONFIG =====================
-
-export async function updatePlatformConfig(config) {
-  await setDoc(doc(db, 'platformConfig', 'general'), {
-    ...config,
-    updatedAt: serverTimestamp()
-  }, { merge: true });
-}
-
-export function onPlatformConfigChange(callback) {
-  return onSnapshot(doc(db, 'platformConfig', 'general'), (snap) => {
-    callback(snap.data());
-  });
-}
-
-export async function resetSemesterEngagement() {
-  const usersRef = collection(db, 'users');
-  const snap = await getDocs(usersRef);
-  
-  const batch = snap.docs.map(u => updateDoc(u.ref, { 
-    engagementScore: 0,
-    badges: [],
-    streak: 0
-  }));
-  
-  await Promise.all(batch);
 }
 
 // ===================== DM READ RECEIPTS =====================
@@ -713,38 +576,10 @@ export function onAttendanceChange(userId, callback) {
     orderBy('timestamp', 'desc')
   );
   return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => {
-      const ts = d.data().timestamp?.toDate();
-      return { 
-        id: d.id, ...d.data(), 
-        dateStr: ts ? ts.toLocaleDateString() : 'Recently',
-        timeStr: ts ? ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
-      };
-    }));
-  });
-}
-
-// ===================== FOCUS TIMER =====================
-
-export async function saveFocusSession(uid, minutes, userName) {
-  // Add to sub-collection
-  await addDoc(collection(db, 'users', uid, 'focusSessions'), {
-    minutes,
-    title: 'Focus Session',
-    timestamp: serverTimestamp()
-  });
-  
-  // Increment global engagement score (+3 for a focus session)
-  const userRef = doc(db, 'users', uid);
-  await updateDoc(userRef, {
-    engagementScore: increment(3)
-  });
-  
-  // Log it
-  await createAuditLog({
-    action: 'Pomodoro Completed',
-    actorName: userName,
-    details: `Completed a ${minutes}-minute focus session.`
+    callback(snap.docs.map(d => ({ 
+      id: d.id, ...d.data(), 
+      date: d.data().timestamp?.toDate()?.toLocaleDateString() || 'Recently' 
+    })));
   });
 }
 
@@ -839,7 +674,7 @@ export async function clearAllNotifications(userId) {
   await Promise.all(batch);
 }
 
-// ===================== TASK BOARD =====================
+// (Duplicated Board Task functions removed)
 
 export async function seedInitialTasks() {
   const tasks = [
@@ -886,7 +721,7 @@ export function onAuditLogChange(callback) {
   });
 }
 
-// ===================== INTERVIEW FORUM =====================
+// ===================== INTERVIEW EXPERIENCES =====================
 
 export function onInterviewExperiencesChange(callback) {
   const q = query(collection(db, 'interviewExperiences'), orderBy('createdAt', 'desc'));
@@ -898,101 +733,98 @@ export function onInterviewExperiencesChange(callback) {
   });
 }
 
-export async function addInterviewExperience(data) {
+export async function postInterviewExperience({ company, role, fullText, tags, authorId, authorName }) {
   return await addDoc(collection(db, 'interviewExperiences'), {
-    ...data,
-    upvotes: 0,
-    upvotedBy: [],
+    company,
+    role,
+    fullText,
+    tags: tags || [],
+    authorId,
+    authorName,
+    upvotes: [],
     createdAt: serverTimestamp()
   });
 }
 
-export async function upvoteInterviewExperience(id, userId) {
-  const ref = doc(db, 'interviewExperiences', id);
+export async function voteInterviewExperience(expId, userId) {
+  const ref = doc(db, 'interviewExperiences', expId);
   const snap = await getDoc(ref);
   if (!snap.exists()) return;
-  const data = snap.data();
-  const upvotedBy = data.upvotedBy || [];
-  
-  if (upvotedBy.includes(userId)) {
-    await updateDoc(ref, {
-      upvotes: increment(-1),
-      upvotedBy: upvotedBy.filter(u => u !== userId)
-    });
-  } else {
-    await updateDoc(ref, {
-      upvotes: increment(1),
-      upvotedBy: [...upvotedBy, userId]
-    });
-  }
+  const upvotes = snap.data().upvotes || [];
+  await updateDoc(ref, {
+    upvotes: upvotes.includes(userId)
+      ? upvotes.filter(u => u !== userId)
+      : [...upvotes, userId]
+  });
 }
 
-// ===================== SYLLABUS TRACKER =====================
+export async function deleteInterviewExperience(expId) {
+  await deleteDoc(doc(db, 'interviewExperiences', expId));
+}
 
-export function onSyllabusChange(callback) {
-  const q = query(collection(db, 'syllabus'), orderBy('priority', 'asc'));
+// ===================== STUDY ROOMS =====================
+
+export function onStudyRoomMessages(roomId, callback) {
+  const q = query(
+    collection(db, 'studyRooms', roomId, 'messages'),
+    orderBy('createdAt', 'asc'),
+    limit(100)
+  );
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
 }
 
-export async function updateTopicStatus(syllabusId, topicId, status) {
-  const ref = doc(db, 'syllabus', syllabusId);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) return;
-  const topics = snap.data().topics || [];
-  const updated = topics.map(t => t.id === topicId ? { ...t, status } : t);
-  await updateDoc(ref, { topics: updated, updatedAt: serverTimestamp() });
+export async function sendStudyRoomMessage(roomId, { text, senderId, senderName }) {
+  return await addDoc(collection(db, 'studyRooms', roomId, 'messages'), {
+    text,
+    senderId,
+    senderName,
+    createdAt: serverTimestamp()
+  });
 }
 
-// Handled by Admin controls above
-
-// ===================== SEEDING ENGINE =====================
-
-export async function seedInstitutionalData() {
-  const batch = writeBatch(db);
-
-  // 1. Platform Config
-  batch.set(doc(db, 'platformConfig', 'universal'), {
-    maintenanceBanner: 'Welcome to the new DYPIU Collab Platform. Professional Skill Matrix is now live.',
-    isMaintenanceMode: false,
-    updatedAt: serverTimestamp()
+export async function joinStudyRoom(roomId, userId, userName) {
+  await setDoc(doc(db, 'studyRooms', roomId, 'presence', userId), {
+    userName,
+    joinedAt: serverTimestamp()
   });
-
-  // 2. Placement Stats
-  batch.set(doc(db, 'placementStats', 'current'), {
-    totalPlaced: '450+',
-    avgPackage: '7.5 LPA',
-    topPackage: '44 LPA',
-    totalCompanies: '120+',
-    updatedAt: serverTimestamp()
-  });
-
-  // 3. Syllabus Skeleton (DBMS & AI)
-  const dbmsRef = doc(db, 'syllabus', 'dbms_sem4');
-  batch.set(dbmsRef, {
-    title: 'Database Management Systems',
-    priority: 1,
-    topics: [
-      { id: 't1', name: 'Relational Model & Algebraic Queries', status: 'completed' },
-      { id: 't2', name: 'Normalization (1NF, 2NF, 3NF, BCNF)', status: 'completed' },
-      { id: 't3', name: 'Indexing & Transaction Management', status: 'pending' },
-      { id: 't4', name: 'NoSQL & Distributed Databases', status: 'pending' }
-    ],
-    updatedAt: serverTimestamp()
-  });
-
-  const aiRef = doc(db, 'syllabus', 'ai_sem6');
-  batch.set(aiRef, {
-    title: 'Artificial Intelligence',
-    priority: 2,
-    topics: [
-      { id: 'a1', name: 'Probability Theory & Neural Networks', status: 'completed' },
-      { id: 'a2', name: 'NLP & Large Language Models', status: 'pending' }
-    ],
-    updatedAt: serverTimestamp()
-  });
-
-  await batch.commit();
-  return true;
 }
+
+export async function leaveStudyRoom(roomId, userId) {
+  try {
+    await deleteDoc(doc(db, 'studyRooms', roomId, 'presence', userId));
+  } catch (_) { /* ignore if already gone */ }
+}
+
+export function onStudyRoomPresence(roomId, callback) {
+  return onSnapshot(collection(db, 'studyRooms', roomId, 'presence'), (snap) => {
+    callback(snap.docs.map(d => ({ uid: d.id, ...d.data() })));
+  });
+}
+
+// ===================== FOCUS SESSIONS =====================
+
+export async function saveFocusSession(userId, { durationMinutes, mode }) {
+  await addDoc(collection(db, 'users', userId, 'focusSessions'), {
+    durationMinutes,
+    mode,
+    completedAt: serverTimestamp()
+  });
+  // Each completed focus session earns 5 engagement points
+  await updateDoc(doc(db, 'users', userId), { engagementScore: increment(5) });
+}
+
+export async function getFocusSessionCount(userId) {
+  const snap = await getDocs(collection(db, 'users', userId, 'focusSessions'));
+  return snap.size;
+}
+
+// ===================== USER ROLE MANAGEMENT (Admin) =====================
+
+export async function updateUserRole(targetUid, newRole) {
+  const roleLevel = ROLE_LEVEL[newRole] || 1;
+  await updateDoc(doc(db, 'users', targetUid), { role: newRole, roleLevel });
+}
+
+

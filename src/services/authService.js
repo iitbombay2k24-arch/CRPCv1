@@ -8,35 +8,16 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
-  sendEmailVerification,
-  reload
+  sendEmailVerification
 } from 'firebase/auth';
 import {
   doc, setDoc, getDoc, collection, getDocs, updateDoc, serverTimestamp
 } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
-import { ROLE_LEVEL, ROLES, isValidDomain } from '../lib/rbac';
-import { STUDENT_MASTER_LIST } from '../lib/studentData';
-
-function normalizeUserProfile(data = {}, uid) {
-  const safeRole = ROLE_LEVEL[data.role] ? data.role : ROLES.STUDENT;
-  return {
-    uid,
-    ...data,
-    role: safeRole,
-    roleLevel: ROLE_LEVEL[safeRole]
-  };
-}
-
-function assertValidInstitutionEmail(email) {
-  if (!isValidDomain(email)) {
-    throw new Error('Use your DYPIU institutional email to continue.');
-  }
-}
+import { ROLE_LEVEL } from '../lib/rbac';
 
 // ---- LOGIN ----
 export async function loginUser(email, password) {
-  assertValidInstitutionEmail(email);
   const cred = await signInWithEmailAndPassword(auth, email, password);
   const userDoc = await getDoc(doc(db, 'users', cred.user.uid));
   if (userDoc.exists()) {
@@ -44,36 +25,32 @@ export async function loginUser(email, password) {
       status: 'online',
       lastSeen: serverTimestamp()
     });
-    return normalizeUserProfile(userDoc.data(), cred.user.uid);
+    return { uid: cred.user.uid, ...userDoc.data() };
   }
   return null;
 }
 
 // ---- REGISTER ----
-export async function registerUser({ email, password, name, prn, division, batch, branch }) {
-  assertValidInstitutionEmail(email);
-
-  // MASTER PRN VALIDATION
-  const masterRecord = STUDENT_MASTER_LIST.find(s => s.prn === prn);
-  if (!masterRecord) {
-    throw new Error('Invalid PRN. Enrollment verification failed. Please check your PRN or contact admin.');
-  }
-
+export async function registerUser({ email, password, name, prn, role, division, batch, branch }) {
   const cred = await createUserWithEmailAndPassword(auth, email, password);
 
   // Send email verification (PRD: unverified users cannot access app)
   await sendEmailVerification(cred.user);
 
+  const assignedRole = role || 'Student';
   const userData = {
     uid: cred.user.uid,
     email,
-    name: masterRecord.name || name, // Prefer official records
-    prn: prn,
-    role: ROLES.STUDENT,
-    division: masterRecord.div || division || 'A',
-    batch: batch || '2024-2028',
-    branch: branch || 'Computer Engineering',
+    name,
+    prn: prn || '',
+    role: assignedRole,
+    roleLevel: ROLE_LEVEL[assignedRole] || 1,
+    division: division || 'A',
+    batch: batch || '',
+    branch: branch || '',
     cgpa: 0,
+    streak: 0,
+    quizzesTaken: 0,
     isActive: true,
     status: 'online',
     avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`,
@@ -89,26 +66,7 @@ export async function registerUser({ email, password, name, prn, division, batch
   };
 
   await setDoc(doc(db, 'users', cred.user.uid), userData);
-  return normalizeUserProfile(userData, cred.user.uid);
-}
-
-export async function resendVerificationEmail() {
-  const user = auth.currentUser;
-  if (!user) {
-    throw new Error('No authenticated user found. Please sign in again.');
-  }
-  if (user.emailVerified) {
-    return { alreadyVerified: true };
-  }
-  await sendEmailVerification(user);
-  return { alreadyVerified: false };
-}
-
-export async function refreshCurrentUser() {
-  const user = auth.currentUser;
-  if (!user) return null;
-  await reload(user);
-  return auth.currentUser;
+  return { uid: cred.user.uid, ...userData };
 }
 
 // ---- LOGOUT ----
@@ -128,7 +86,7 @@ export async function logoutUser() {
 // ---- GET USER PROFILE ----
 export async function getUserProfile(uid) {
   const snap = await getDoc(doc(db, 'users', uid));
-  return snap.exists() ? normalizeUserProfile(snap.data(), snap.id) : null;
+  return snap.exists() ? { uid: snap.id, ...snap.data() } : null;
 }
 
 // ---- UPDATE USER STATUS ----
@@ -142,23 +100,32 @@ export function onAuthChange(callback) {
     if (user) {
       try {
         const profile = await getUserProfile(user.uid);
-        callback(user, profile || { 
-          uid: user.uid,
-          name: user.email?.split('@')[0] || 'User',
-          email: user.email,
-          role: ROLES.STUDENT,
-          roleLevel: ROLE_LEVEL[ROLES.STUDENT],
-          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${user.email}` 
-        });
+        if (profile) {
+          // Ensure roleLevel is always present (backfill for existing users)
+          if (!profile.roleLevel) {
+            profile.roleLevel = ROLE_LEVEL[profile.role] || 1;
+          }
+          callback(user, profile);
+        } else {
+          const fallback = {
+            uid: user.uid,
+            name: user.email?.split('@')[0] || 'User',
+            email: user.email,
+            role: 'Student',
+            roleLevel: 1,
+            avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${user.email}`
+          };
+          callback(user, fallback);
+        }
       } catch (err) {
         console.warn('Failed to fetch user profile, using fallback:', err);
-        callback(user, { 
+        callback(user, {
           uid: user.uid,
           name: user.email?.split('@')[0] || 'User',
           email: user.email,
-          role: ROLES.STUDENT,
-          roleLevel: ROLE_LEVEL[ROLES.STUDENT],
-          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${user.email}` 
+          role: 'Student',
+          roleLevel: 1,
+          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${user.email}`
         });
       }
     } else {

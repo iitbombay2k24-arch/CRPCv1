@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Timer, Play, Pause, RotateCcw, Brain, Target, Bell, Settings, History } from 'lucide-react';
+import { Timer, Play, Pause, RotateCcw, Brain, Target, Bell, Settings, History, Flame } from 'lucide-react';
 import Badge from '../components/ui/Badge';
 import useAuthStore from '../store/authStore';
-import useNotificationStore from '../store/notificationStore';
-import { saveFocusSession } from '../services/firestoreService';
+import { saveFocusSession, getFocusSessionCount } from '../services/firestoreService';
 
 const MODES = [
   { label: 'Focus',       minutes: 25, color: 'text-indigo-400' },
@@ -13,15 +12,23 @@ const MODES = [
 
 export default function FocusPage() {
   const { user } = useAuthStore();
-  const { success } = useNotificationStore();
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [isActive, setIsActive] = useState(false);
   const [modeIdx, setModeIdx] = useState(0);
   const [sessions, setSessions] = useState(0);
+  const [isSavingSession, setIsSavingSession] = useState(false);
 
   const mode = MODES[modeIdx];
   const totalTime = mode.minutes * 60;
   const progress = ((totalTime - timeLeft) / totalTime) * 100;
+
+  // Load persisted session count from Firestore on mount
+  useEffect(() => {
+    if (!user?.uid) return;
+    getFocusSessionCount(user.uid)
+      .then(count => setSessions(count))
+      .catch(err => console.warn('Could not load focus session count:', err));
+  }, [user?.uid]);
 
   useEffect(() => {
     if (!isActive || timeLeft <= 0) return;
@@ -30,12 +37,9 @@ export default function FocusPage() {
         if (p <= 1) {
           clearInterval(t);
           setIsActive(false);
+          // Only persist completed Focus sessions (not breaks)
           if (modeIdx === 0) {
-            setSessions((s) => s + 1);
-            if (user?.uid) {
-              saveFocusSession(user.uid, MODES[0].minutes, user.name);
-              success('+3 Engagement Points', 'Focus session completed!');
-            }
+            handleSessionComplete();
           }
           return 0;
         }
@@ -43,7 +47,21 @@ export default function FocusPage() {
       });
     }, 1000);
     return () => clearInterval(t);
-  }, [isActive, modeIdx, timeLeft, user?.uid, user?.name, success]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, modeIdx]);
+
+  const handleSessionComplete = async () => {
+    setSessions(prev => prev + 1);
+    if (!user?.uid) return;
+    setIsSavingSession(true);
+    try {
+      await saveFocusSession(user.uid, { durationMinutes: 25, mode: 'Focus' });
+    } catch (err) {
+      console.warn('Could not save focus session:', err);
+    } finally {
+      setIsSavingSession(false);
+    }
+  };
 
   const handleMode = (idx) => {
     setModeIdx(idx);
@@ -77,8 +95,14 @@ export default function FocusPage() {
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right hidden sm:block">
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sessions</p>
-            <p className="text-2xl font-black text-white">{sessions}</p>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center justify-end gap-1">
+              <Flame size={10} className="text-orange-400" /> Sessions
+            </p>
+            <p className="text-2xl font-black text-white">
+              {isSavingSession ? (
+                <span className="text-lg text-indigo-400 animate-pulse">Saving...</span>
+              ) : sessions}
+            </p>
           </div>
           <button className="p-2.5 bg-white/[0.04] border border-white/[0.06] rounded-xl text-slate-400 hover:text-white transition-all">
             <Settings size={16} />
@@ -111,7 +135,7 @@ export default function FocusPage() {
             <svg className="w-full h-full -rotate-90" viewBox="0 0 320 320">
               {/* Track */}
               <circle cx="160" cy="160" r="140" fill="none" className="stroke-white/[0.05]" strokeWidth="14" />
-              {/* Glow ring */}
+              {/* Progress ring */}
               <circle
                 cx="160" cy="160" r="140"
                 fill="none"
@@ -129,7 +153,6 @@ export default function FocusPage() {
                 </linearGradient>
               </defs>
             </svg>
-            {/* Filter glow */}
             <div className="absolute inset-0 rounded-full" style={{ boxShadow: 'inset 0 0 60px rgba(99,102,241,0.05)' }} />
 
             <div className="absolute inset-0 flex flex-col items-center justify-center">
