@@ -24,8 +24,14 @@ export default function GroupStudyPage() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [onlineUsers, setOnlineUsers] = useState([]);
+  const [isVoiceConnected, setIsVoiceConnected] = useState(false);
+  const [micLevel, setMicLevel] = useState(0);
   const chatRef = useRef(null);
-  const { info } = useNotificationStore();
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const streamRef = useRef(null);
+  const animationRef = useRef(null);
+  const { info, error } = useNotificationStore();
   const { user } = useAuthStore();
 
   const ROOM_ID = 'group_study_main';
@@ -43,6 +49,57 @@ export default function GroupStudyPage() {
       setOnlineUsers(users.filter(u => u.status === 'online').slice(0, 12));
     });
     return () => unsub();
+  }, []);
+
+  const startVoice = async () => {
+    if (isVoiceConnected) {
+      // Disconnect
+      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+      if (audioContextRef.current) audioContextRef.current.close();
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      setIsVoiceConnected(false);
+      setMicLevel(0);
+      info('Voice Disconnected', 'You have left the audio channel.');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      const source = audioCtx.createMediaStreamSource(stream);
+      source.connect(analyser);
+
+      audioContextRef.current = audioCtx;
+      analyserRef.current = analyser;
+      setIsVoiceConnected(true);
+      info('Voice Connected', 'Microphone active. Your audio is live in the room.');
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      const updateMicLevel = () => {
+        analyser.getByteFrequencyData(dataArray);
+        const sum = dataArray.reduce((a, b) => a + b, 0);
+        const avg = sum / dataArray.length;
+        setMicLevel(avg); // 0 to ~255
+        animationRef.current = requestAnimationFrame(updateMicLevel);
+      };
+      updateMicLevel();
+
+    } catch (err) {
+      console.error('Mic access denied:', err);
+      error('Microphone Denied', 'Please allow microphone access to join voice.');
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+      if (audioContextRef.current) audioContextRef.current.close();
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    };
   }, []);
 
   const handleSend = async (e) => {
@@ -84,7 +141,14 @@ export default function GroupStudyPage() {
           <Badge variant="success" className="animate-pulse">
             {onlineUsers.length > 0 ? `${onlineUsers.length} Online Now` : 'Loading...'}
           </Badge>
-          <Button onClick={() => info('Voice Connected', 'You have joined the study room audio channel.')} variant="primary" icon={Mic} size="sm">Join Voice</Button>
+          <Button 
+            onClick={startVoice} 
+            variant={isVoiceConnected ? "danger" : "primary"} 
+            icon={Mic} 
+            size="sm"
+          >
+            {isVoiceConnected ? 'Disconnect' : 'Join Voice'}
+          </Button>
         </div>
       </div>
 
@@ -156,13 +220,28 @@ export default function GroupStudyPage() {
               Online Now ({onlineUsers.length})
             </h4>
             <div className="flex flex-wrap gap-4">
-              {onlineUsers.length > 0 ? onlineUsers.slice(0, 6).map((u) => (
+              {/* Render Local User if Voice is Connected */}
+              {isVoiceConnected && user && (
+                <div className="flex flex-col items-center gap-1">
+                   <div className={`relative rounded-full transition-all duration-75
+                     ${micLevel > 10 ? 'ring-4 ring-emerald-500/50 scale-110' : 'ring-2 ring-transparent'}
+                   `}>
+                     <Avatar name={user.name} size="md" className="border-2 border-emerald-400" />
+                     {micLevel > 10 && (
+                       <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-slate-900 animate-ping" />
+                     )}
+                   </div>
+                   <span className="text-[10px] text-emerald-400 font-bold">{user.name?.split(' ')[0]} (You)</span>
+                </div>
+              )}
+
+              {onlineUsers.length > 0 ? onlineUsers.filter(u => u.uid !== user?.uid).slice(0, 6).map((u) => (
                 <div key={u.uid} className="flex flex-col items-center gap-1">
-                   <Avatar name={u.name} src={u.avatar} size="md" className="border-2 border-emerald-500/20" />
+                   <Avatar name={u.name} size="md" className="border-2 border-indigo-500/20" />
                    <span className="text-[10px] text-slate-500 font-bold">{u.name?.split(' ')[0]}</span>
                 </div>
               )) : (
-                <p className="text-xs text-slate-600 italic">No one else is online yet. Invite your classmates!</p>
+                !isVoiceConnected && <p className="text-xs text-slate-600 italic">No one else is online yet. Invite your classmates!</p>
               )}
               {onlineUsers.length > 6 && (
                 <div className="w-10 h-10 bg-white/[0.02] border border-dashed border-white/10 rounded-full flex items-center justify-center text-slate-600 text-[10px] font-black">

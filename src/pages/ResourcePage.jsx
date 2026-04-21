@@ -5,12 +5,14 @@ import {
   CheckCircle2, Circle, ChevronDown, ChevronUp, Target, ExternalLink, Globe, HardDrive
 } from 'lucide-react';
 import useAuthStore from '../store/authStore';
-import { onResourcesChange, incrementDownload, onSyllabusChange, updateTopicStatus } from '../services/firestoreService';
+import { onResourcesChange, incrementDownload, onSyllabusChange, updateTopicStatus, onCourseArchivesChange } from '../services/firestoreService';
 import { hasPermission } from '../lib/rbac';
 import { formatFileSize, formatTimeAgo } from '../lib/utils';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import UploadResourceModal from '../modals/UploadResourceModal';
+import CreateSyllabusModal from '../modals/CreateSyllabusModal';
+import CreateCourseArchiveModal from '../modals/CreateCourseArchiveModal';
 import Spinner from '../components/ui/Spinner';
 
 const TYPE_CONFIG = {
@@ -32,7 +34,10 @@ export default function ResourcePage() {
   const [activeSegment, setActiveSegment] = useState('Files'); // 'Files', 'Syllabus', 'DMS'
   const [resources, setResources] = useState([]);
   const [syllabus, setSyllabus] = useState([]);
+  const [courseArchives, setCourseArchives] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSyllabusModalOpen, setIsSyllabusModalOpen] = useState(false);
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('All');
@@ -42,7 +47,8 @@ export default function ResourcePage() {
   useEffect(() => {
     const unsubRes = onResourcesChange((data) => { setResources(data); setIsLoading(false); });
     const unsubSyl = onSyllabusChange((data) => { setSyllabus(data); });
-    return () => { unsubRes(); unsubSyl(); };
+    const unsubArc = onCourseArchivesChange((data) => { setCourseArchives(data); });
+    return () => { unsubRes(); unsubSyl(); unsubArc(); };
   }, []);
 
   const filtered = resources.filter((r) => {
@@ -246,33 +252,34 @@ export default function ResourcePage() {
 
         {activeSegment === 'Syllabus' && (
           <div className="max-w-4xl mx-auto space-y-6">
-             <div className="p-8 glass-card rounded-[2.5rem] bg-indigo-600/5 border-indigo-500/20 flex flex-col md:flex-row items-center gap-8 mb-10">
-                <div className="w-20 h-20 bg-indigo-500/20 rounded-3xl flex items-center justify-center text-indigo-400 shrink-0">
-                   <Target size={40} />
+              <div className="p-8 glass-card rounded-[2.5rem] bg-indigo-600/5 border-indigo-500/20 flex flex-col md:flex-row items-center justify-between gap-8 mb-10">
+                <div className="flex flex-col md:flex-row items-center gap-8">
+                  <div className="w-20 h-20 bg-indigo-500/20 rounded-3xl flex items-center justify-center text-indigo-400 shrink-0">
+                     <Target size={40} />
+                  </div>
+                  <div>
+                     <h3 className="text-2xl font-black text-white mb-2">Curriculum Tracker</h3>
+                     <p className="text-slate-400 text-sm leading-relaxed max-w-xl">
+                        Real-time visibility into the current academic term. Track completion percentage across core subjects.
+                     </p>
+                  </div>
                 </div>
-                <div>
-                   <h3 className="text-2xl font-black text-white mb-2">Curriculum Tracker</h3>
-                   <p className="text-slate-400 text-sm leading-relaxed max-w-xl">
-                      Real-time visibility into the current academic term. Track completion percentage across core subjects.
-                   </p>
-                </div>
-             </div>
+                {canUpdateSyllabus && (
+                  <Button onClick={() => setIsSyllabusModalOpen(true)} variant="primary" icon={Plus}>Add Subject</Button>
+                )}
+              </div>
 
-             <div className="grid gap-6">
-                {(syllabus.length > 0 ? syllabus : [
-                  { id: '1', title: 'Database Management Systems', priority: 1, topics: [
-                    { id: 't1', name: 'Relational Model & Algebraic Queries', status: 'completed' },
-                    { id: 't2', name: 'Normalization (1NF, 2NF, 3NF, BCNF)', status: 'completed' },
-                    { id: 't3', name: 'Indexing & Transaction Management', status: 'pending' },
-                    { id: 't4', name: 'NoSQL & Distributed Databases', status: 'pending' }
-                  ]},
-                  { id: '2', title: 'Artificial Intelligence', priority: 2, topics: [
-                    { id: 'a1', name: 'Probability Theory & Neural Networks', status: 'completed' },
-                    { id: 'a2', name: 'NLP & Large Language Models', status: 'pending' }
-                  ]}
-                ]).map(sub => {
-                  const completed = sub.topics.filter(t => t.status === 'completed').length;
-                  const total = sub.topics.length;
+              {syllabus.length === 0 ? (
+                <div className="py-20 flex flex-col items-center justify-center text-center border border-dashed border-white/[0.05] rounded-[2.5rem]">
+                  <BookOpen size={48} className="text-slate-700 mb-4" />
+                  <p className="text-sm font-bold text-slate-300">No syllabus topics tracked yet.</p>
+                  <p className="text-xs text-slate-500 mt-1">Faculty can add subjects to begin tracking curriculum progress.</p>
+                </div>
+              ) : (
+                <div className="grid gap-6">
+                  {syllabus.sort((a, b) => (a.priority || 0) - (b.priority || 0)).map(sub => {
+                    const completed = sub.topics.filter(t => t.status === 'completed').length;
+                    const total = sub.topics.length || 1;
                   const percent = Math.round((completed / total) * 100);
                   const isExpanded = expandedSyllabus[sub.id];
 
@@ -338,7 +345,8 @@ export default function ResourcePage() {
                     </div>
                   );
                 })}
-             </div>
+              </div>
+              )}
           </div>
         )}
 
@@ -369,16 +377,22 @@ export default function ResourcePage() {
             </div>
 
             <div className="space-y-4">
-               <div className="flex items-center gap-2 px-2">
-                  <HardDrive size={16} className="text-slate-500" />
-                  <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest">Institutional File Archive ({activePattern})</h3>
+               <div className="flex items-center justify-between px-2">
+                  <div className="flex items-center gap-2">
+                     <HardDrive size={16} className="text-slate-500" />
+                     <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest">Institutional File Archive ({activePattern})</h3>
+                  </div>
+                  {canUpdateSyllabus && (
+                     <Button onClick={() => setIsArchiveModalOpen(true)} variant="ghost" size="sm" icon={Plus}>Add Archive</Button>
+                  )}
                </div>
 
-               {[
-                 { title: 'Professional Skills - I', sem: '4', sections: ['A', 'B', 'C', 'D', 'E', 'F'] },
-                 { title: 'Professional Skills - II', sem: '6', sections: ['A', 'B', 'C', 'D', 'E'] },
-                 { title: 'Corporate Alignment Program', sem: '2', sections: ['BATCH-1', 'BATCH-2'] }
-               ].map((course, idx) => (
+               {courseArchives.filter(a => a.pattern === activePattern).length === 0 ? (
+                 <div className="py-12 text-center border border-dashed border-white/5 rounded-[2rem]">
+                    <HardDrive size={32} className="mx-auto text-slate-600 mb-3 opacity-50" />
+                    <p className="text-slate-400 font-bold text-sm">No archives for {activePattern}</p>
+                 </div>
+               ) : courseArchives.filter(a => a.pattern === activePattern).map((course, idx) => (
                  <div key={idx} className="glass-card rounded-[2rem] overflow-hidden border-white/[0.03]">
                     <div className="p-6 bg-white/[0.01] border-b border-white/[0.03] flex items-center justify-between">
                        <div className="flex items-center gap-4">
@@ -415,6 +429,8 @@ export default function ResourcePage() {
       </div>
 
       <UploadResourceModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <CreateSyllabusModal isOpen={isSyllabusModalOpen} onClose={() => setIsSyllabusModalOpen(false)} />
+      <CreateCourseArchiveModal isOpen={isArchiveModalOpen} onClose={() => setIsArchiveModalOpen(false)} />
     </div>
   );
 }

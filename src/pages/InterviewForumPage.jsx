@@ -9,15 +9,16 @@ import Avatar from '../components/ui/Avatar';
 import useNotificationStore from '../store/notificationStore';
 import { onInterviewExperiencesChange, upvoteInterviewExperience } from '../services/firestoreService';
 import useAuthStore from '../store/authStore';
-
-
+import CreateInterviewExperienceModal from '../modals/CreateInterviewExperienceModal';
+import Spinner from '../components/ui/Spinner';
 
 export default function InterviewForumPage() {
   const { user } = useAuthStore();
   const [search, setSearch] = useState('');
   const [experiences, setExperiences] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { info, success } = useNotificationStore();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { success } = useNotificationStore();
 
   useEffect(() => {
     const unsub = onInterviewExperiencesChange((data) => {
@@ -50,7 +51,7 @@ export default function InterviewForumPage() {
             <p className="text-[11px] text-slate-500">Learn from seniors who cleared top companies</p>
           </div>
         </div>
-        <Button onClick={() => info('Share Experience', 'Contribution portal opening soon')} variant="primary" icon={PlusCircle}>Share Experience</Button>
+        <Button onClick={() => setIsModalOpen(true)} variant="primary" icon={PlusCircle}>Share Experience</Button>
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar p-7">
@@ -73,8 +74,11 @@ export default function InterviewForumPage() {
           </div>
 
           {/* Cards */}
-          <div className="grid grid-cols-1 gap-4">
-            {filtered.map((exp, i) => (
+          {isLoading ? (
+            <div className="py-20 flex justify-center"><Spinner size="lg" /></div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {filtered.map((exp, i) => (
               <div 
                 key={i}
                 className="glass-card rounded-3xl p-6 group cursor-pointer hover:border-indigo-500/30 transition-all flex gap-6"
@@ -129,7 +133,8 @@ export default function InterviewForumPage() {
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+          )}
 
           {filtered.length === 0 && (
             <div className="py-20 text-center opacity-40">
@@ -144,6 +149,8 @@ export default function InterviewForumPage() {
           </div>
         </div>
       </div>
+      
+      <CreateInterviewExperienceModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 }

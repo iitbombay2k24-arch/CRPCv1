@@ -46,13 +46,7 @@ export default function LeaderboardPage() {
     return () => { unsubGlobal(); unsubDivs(); };
   }, []);
 
-  const leaders = activeSegment === 'Division' ? divisionLeaders : (realLeaders.length > 0 ? realLeaders : [
-    { name: 'SHARVANI GHUGARE', score: 1420, rank: 1, trend: 'up',     division: 'Div A' },
-    { name: 'SWARAJ SHASTRI',   score: 1385, rank: 2, trend: 'stable', division: 'Div A' },
-    { name: 'RISHI KUMAR PANDA',score: 1340, rank: 3, trend: 'down',   division: 'Div A' },
-    { name: 'MISHTI GOEL',      score: 1290, rank: 4, trend: 'up',     division: 'Div A' },
-    { name: 'ADARSH RANJAN',    score: 1255, rank: 5, trend: 'up',     division: 'Div A' },
-  ]);
+  const leaders = activeSegment === 'Division' ? divisionLeaders : realLeaders;
 
   const PODIUM = [
     { idx: 1, heightClass: 'h-72', ringColor: 'border-slate-400/40', topAccent: 'bg-slate-400', badge: 'text-slate-300', label: 'RANK #2' },
@@ -191,6 +185,14 @@ export default function LeaderboardPage() {
               </tbody>
             </table>
           </div>
+
+          {leaders.length === 0 && (
+            <div className="py-20 flex flex-col items-center justify-center text-center">
+              <Trophy size={48} className="text-slate-700 mb-4 opacity-50" />
+              <p className="text-sm font-bold text-slate-400">Leaderboard computing...</p>
+              <p className="text-xs text-slate-500 mt-1">Check back soon for rank updates.</p>
+            </div>
+          )}
 
           {/* Bottom Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

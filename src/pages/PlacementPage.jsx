@@ -11,6 +11,9 @@ import useNotificationStore from '../store/notificationStore';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import confetti from 'canvas-confetti';
+import CreateDriveModal from '../modals/CreateDriveModal';
+import { Plus } from 'lucide-react';
+import { hasPermission } from '../lib/rbac';
 
 const STATS = [
   { label: 'Total Placed', value: '412', icon: Users,     color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
@@ -41,6 +44,9 @@ export default function PlacementPage() {
   const [realDrives, setRealDrives] = useState([]);
   const [isApplying, setIsApplying] = useState(null);
   const [placementStats, setPlacementStats] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const canManageDrives = user?.roleLevel >= 3 || user?.role === 'Faculty';
 
   useEffect(() => {
     const q = query(collection(db, 'placementDrives'), orderBy('createdAt', 'desc'));
@@ -76,11 +82,7 @@ export default function PlacementPage() {
     }
   };
 
-  const drives = realDrives.length > 0 ? realDrives : [
-    { company: 'Google', role: 'SWE – Cloud', date: 'Delayed', package: '32 LPA', status: 'Ongoing' },
-    { company: 'Microsoft', role: 'Security Analyst', date: 'Completed', package: '28 LPA', status: 'Selection Done' },
-    { company: 'TCS', role: 'Ninja / Digital', date: 'Next Week', package: '7.5 LPA', status: 'Open' },
-  ];
+  const drives = realDrives; // Removed the dummy data array fallback
 
   const displayStats = placementStats ? [
     { label: 'Total Placed', value: placementStats.totalPlaced || '0', icon: Users,     color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
@@ -167,9 +169,23 @@ export default function PlacementPage() {
 
           {/* Upcoming Drives */}
           <div className="glass-card rounded-3xl p-6">
-            <h3 className="text-sm font-bold text-white mb-5">Upcoming Drives</h3>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-sm font-bold text-white">Upcoming Drives</h3>
+              {canManageDrives && (
+                <Button size="sm" variant="primary" icon={Plus} onClick={() => setIsModalOpen(true)}>
+                  Add Drive
+                </Button>
+              )}
+            </div>
+            
             <div className="space-y-3">
-              {drives.map((d, i) => (
+              {drives.length === 0 ? (
+                <div className="py-10 flex flex-col items-center justify-center text-center border border-dashed border-white/[0.05] rounded-2xl">
+                  <Briefcase size={24} className="text-slate-700 mb-2" />
+                  <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">No active drives</p>
+                </div>
+              ) : (
+                drives.map((d, i) => (
                 <div
                   key={i}
                   className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.05] hover:border-indigo-500/30 hover:bg-white/[0.05] transition-all cursor-pointer group"
@@ -201,7 +217,8 @@ export default function PlacementPage() {
                     </Button>
                   )}
                 </div>
-              ))}
+              ))
+              )}
             </div>
             <Button variant="ghost" className="w-full mt-4 text-[11px]" iconRight={ArrowRight}>
               View all drives
@@ -230,6 +247,8 @@ export default function PlacementPage() {
           </div>
         </div>
       </div>
+      
+      <CreateDriveModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 }

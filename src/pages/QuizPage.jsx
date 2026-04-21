@@ -4,6 +4,8 @@ import {
   Timer, ChevronRight, ShieldAlert, Star, BarChart2, CheckCircle2
 } from 'lucide-react';
 import useAuthStore from '../store/authStore';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { onQuizzesChange, submitQuizResult } from '../services/firestoreService';
 import { hasPermission } from '../lib/rbac';
 import Badge from '../components/ui/Badge';
@@ -21,12 +23,13 @@ export default function QuizPage() {
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [isFinished, setIsFinished] = useState(false);
+  const [isGrading, setIsGrading] = useState(false);
   const [result, setResult] = useState(null);
 
   // Use refs to track mutable quiz state without stale closures
   const answersRef = useRef({});
-  const scoreRef = useRef(0);
   const timeLeftRef = useRef(0);
+  const violationsRef = useRef(0);
   const [timeLeft, setTimeLeft] = useState(0);
   const timerRef = useRef(null);
 
@@ -46,30 +49,64 @@ export default function QuizPage() {
     stopTimer();
     setIsFinished(true);
 
-    const finalScore = scoreRef.current;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+
+    setIsGrading(true);
+
     const finalAnswers = { ...answersRef.current };
     const timeTaken = (quiz.duration * 60) - timeLeftRef.current;
+    const tabSwitches = violationsRef.current;
 
-    setResult({ score: finalScore, total: quiz.questions.length, timeTaken });
+    setResult({ score: finalScore, total: quiz.questions.length, timeTaken, tabSwitches });
 
     try {
-      await submitQuizResult(quiz.id, {
+      const submissionId = await submitQuizResult(quiz.id, {
         userId: user.uid,
         userName: user.name,
-        score: finalScore,
-        total: quiz.questions.length,
         answers: finalAnswers,
         timeTaken,
+        isFlagged: tabSwitches > 2, // Threshold for suspicious activity
+        violationsCount: tabSwitches
+      });
+
+      // Listen for the cloud function to grade the submission
+      const subRef = doc(db, 'quizzes', quiz.id, 'submissions', submissionId);
+      const unsubscribe = onSnapshot(subRef, (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.gradedAt) {
+            setResult({
+              score: data.score,
+              total: data.totalPossible,
+              percentage: parseFloat(data.percentage),
+              timeTaken,
+              tabSwitches
+            });
+            setIsGrading(false);
+            unsubscribe();
+          }
+        }
       });
     } catch (e) {
       console.error('Failed to submit quiz result:', e);
+      setIsGrading(false);
     }
   }, [stopTimer, user]);
 
   const startQuiz = useCallback((quiz) => {
     answersRef.current = {};
-    scoreRef.current = 0;
     timeLeftRef.current = quiz.duration * 60;
+    violationsRef.current = 0;
+
+    // Task 5: Enforce Fullscreen
+    const elem = document.documentElement;
+    if (elem.requestFullscreen) {
+      elem.requestFullscreen().catch(err => {
+        console.warn(`Error attempting to enable full-screen mode: ${err.message}`);
+      });
+    }
 
     setActiveQuiz(quiz);
     setCurrentQuestionIdx(0);
@@ -78,6 +115,44 @@ export default function QuizPage() {
     setSelectedAnswer(null);
     setResult(null);
   }, []);
+
+  // Task 5: Anti-Cheat Handlers (Visibility & Input)
+  useEffect(() => {
+    if (!activeQuiz || isFinished) return;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        violationsRef.current += 1;
+        // Optional: Show warning alert via store?
+      }
+    };
+
+    const handleContextMenu = (e) => e.preventDefault();
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'v' || e.key === 'i' || e.key === 'j')) {
+        e.preventDefault();
+      }
+    };
+
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement && !isFinished) {
+        // Use a slight delay to allow re-entering or auto-submit
+        console.warn("Fullscreen exited during active quiz");
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, [activeQuiz, isFinished]);
 
   // Timer Effect
   useEffect(() => {
@@ -100,11 +175,6 @@ export default function QuizPage() {
   const handleNext = useCallback(() => {
     const q = activeQuiz.questions[currentQuestionIdx];
 
-    // Check answer and update score ref synchronously
-    if (selectedAnswer !== null && selectedAnswer === q.correctAnswer) {
-      scoreRef.current += 1;
-    }
-
     // Store answer in ref (no stale closure)
     answersRef.current = { ...answersRef.current, [q.id || currentQuestionIdx]: selectedAnswer };
 
@@ -119,9 +189,24 @@ export default function QuizPage() {
 
   const canCreate = hasPermission(user.role, 'CREATE_CHANNEL');
 
+  /* ─── Active Quiz: Grading ─── */
+  if (activeQuiz && isFinished && isGrading) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center p-8 animate-fade-in">
+         <div className="flex flex-col items-center gap-4">
+            <Spinner size="lg" />
+            <p className="text-indigo-400 font-bold uppercase tracking-widest text-xs animate-pulse">
+               Server-Side Grading in Progress...
+            </p>
+            <p className="text-slate-500 text-[10px]">Validating integrity and computing final score via Cloud Functions</p>
+         </div>
+      </div>
+    );
+  }
+
   /* ─── Active Quiz: Finished ─── */
   if (activeQuiz && isFinished && result) {
-    const accuracy = ((result.score / result.total) * 100).toFixed(0);
+    const accuracy = result.percentage || 0;
     const mins = Math.floor(result.timeTaken / 60);
     const secs = result.timeTaken % 60;
     const grade = accuracy >= 90 ? { label: 'Excellent', color: 'text-emerald-400' }

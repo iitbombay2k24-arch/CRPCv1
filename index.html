@@ -13,6 +13,11 @@
     <title>DYPIU Collab — Intelligence. Unity.</title>
   </head>
   <body>
+    <script>
+      window.global = window;
+      window.process = { env: { DEBUG: undefined } };
+      var Buffer = { isBuffer: () => false };
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

@@ -1,57 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Sparkles, Search, Filter, MessageCircle, Heart, Share2, 
-  Clock, User, Bookmark, ChevronRight, BookOpen, Crown, Zap 
+  Clock, User, Bookmark, ChevronRight, BookOpen, Crown, Zap, Plus
 } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Avatar from '../components/ui/Avatar';
-
-const BLOG_POSTS = [
-  {
-    id: '1',
-    title: 'The Future of AI in DYPIU: Transforming the Learning Cycle',
-    excerpt: 'As we enter the new academic term, we explore how Large Language Models are being integrated into our core engineering curriculum...',
-    author: 'Dr. Prabhat Ranjan',
-    role: 'Vice Chancellor',
-    date: 'Oct 24, 2024',
-    readTime: '6 min read',
-    tags: ['Artificial Intelligence', 'Campus Update'],
-    featured: true,
-    image: 'https://images.unsplash.com/photo-1620712943543-bcc4628c71d5?q=80&w=600&auto=format&fit=crop'
-  },
-  {
-    id: '2',
-    title: 'Landing Your Dream Offer: 2024 Placement Guide',
-    excerpt: 'The placement season is peaking. Here is a curated guide on acing the technical rounds at Tier-1 companies like Microsoft and NVIDIA.',
-    author: 'Prof. Nikhil Goud',
-    role: 'TPO Head',
-    date: 'Oct 22, 2024',
-    readTime: '4 min read',
-    tags: ['Placements', 'Career'],
-    image: 'https://images.unsplash.com/photo-1521737711867-e3b97375f902?q=80&w=600&auto=format&fit=crop'
-  },
-  {
-    id: '3',
-    title: 'The Zen of Competitive Programming',
-    excerpt: 'A deep dive into how algorithmic thinking can simplify your daily software engineering tasks, featuring top student insights.',
-    author: 'Swaraj Shastri',
-    role: 'Student Advisor',
-    date: 'Oct 20, 2024',
-    readTime: '8 min read',
-    tags: ['Programming', 'Student Life'],
-    image: 'https://images.unsplash.com/photo-1516116216624-53e697fedbea?q=80&w=600&auto=format&fit=crop'
-  }
-];
+import useAuthStore from '../store/authStore';
+import { onBlogsChange } from '../services/firestoreService';
+import CreateBlogModal from '../modals/CreateBlogModal';
+import Spinner from '../components/ui/Spinner';
 
 export default function CampusBlogPage() {
+  const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTag, setActiveTag] = useState('All');
+  const [blogs, setBlogs] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    const unsub = onBlogsChange((data) => {
+      setBlogs(data);
+      setIsLoading(false);
+    });
+    return () => unsub();
+  }, []);
 
   const tags = ['All', 'Artificial Intelligence', 'Campus Update', 'Placements', 'Career', 'Programming'];
 
-  const featuredPost = BLOG_POSTS.find(p => p.featured);
-  const otherPosts = BLOG_POSTS.filter(p => !p.featured);
+  const filteredBlogs = blogs.filter(b => {
+    const matchesSearch = b.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          b.excerpt?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesTag = activeTag === 'All' || b.tags?.includes(activeTag);
+    return matchesSearch && matchesTag;
+  });
+
+  const featuredPost = filteredBlogs.find(p => p.featured) || filteredBlogs[0];
+  const otherPosts = filteredBlogs.filter(p => p.id !== featuredPost?.id);
 
   return (
     <div className="h-full flex flex-col min-w-0">
@@ -65,7 +51,7 @@ export default function CampusBlogPage() {
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="relative group">
+          <div className="relative group hidden md:block">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-amber-400 transition-colors" />
             <input
               type="text"
@@ -75,12 +61,27 @@ export default function CampusBlogPage() {
               className="bg-white/[0.04] border border-white/[0.08] rounded-xl pl-9 pr-4 py-1.5 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-amber-500/40 w-64 transition-all"
             />
           </div>
-          <Button variant="ghost" size="sm" icon={BookOpen}>Archive</Button>
+          {(user?.roleLevel >= 3 || user?.role === 'Faculty') && (
+            <Button variant="primary" size="sm" icon={Plus} onClick={() => setIsModalOpen(true)}>New Post</Button>
+          )}
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar p-7 space-y-10">
-        {/* Featured Hero */}
+        {isLoading ? (
+          <div className="h-64 flex items-center justify-center"><Spinner size="lg" /></div>
+        ) : blogs.length === 0 ? (
+          <div className="h-64 flex flex-col items-center justify-center text-center">
+            <BookOpen size={48} className="text-slate-700 mb-3" />
+            <p className="text-slate-400 font-semibold">No blogs found</p>
+            <p className="text-slate-600 text-sm">Be the first to share your insights with the campus!</p>
+            {(user?.roleLevel >= 3 || user?.role === 'Faculty') && (
+              <Button variant="primary" className="mt-4" icon={Plus} onClick={() => setIsModalOpen(true)}>Create First Post</Button>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* Featured Hero */}
         {featuredPost && (
           <div className="group relative h-[400px] rounded-[2.5rem] overflow-hidden border border-white/10 shadow-2xl transition-all duration-700 hover:border-amber-500/30">
             <img 
@@ -188,9 +189,12 @@ export default function CampusBlogPage() {
                  <p className="text-slate-400 text-sm max-w-sm">Every Faculty, Researcher and Lead Student is encouraged to use this space for official knowledge synthesis.</p>
               </div>
            </div>
-           <Button variant="primary" icon={Sparkles}>Become a Contributor</Button>
+           <Button variant="primary" icon={Sparkles} onClick={() => setIsModalOpen(true)}>Become a Contributor</Button>
         </div>
+          </>
+        )}
       </div>
+      <CreateBlogModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 }
