@@ -8,11 +8,16 @@ import { sendMessage, onDMMessages, toggleBookmark, markDMAsRead } from '../serv
 import Avatar from '../components/ui/Avatar';
 import Button from '../components/ui/Button';
 
+import UserSearchModal from '../modals/UserSearchModal';
+import useUIStore from '../store/uiStore';
+
 export default function DMPage({ recipient }) {
   const { user } = useAuthStore();
+  const { setDmTarget } = useUIStore();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const scrollRef = useRef(null);
 
   const handleBookmark = async (msg) => await toggleBookmark(user.uid, msg);
@@ -51,14 +56,36 @@ export default function DMPage({ recipient }) {
 
   if (!recipient) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-center p-8">
-        <div className="w-20 h-20 bg-white/[0.03] border border-white/[0.06] rounded-3xl flex items-center justify-center mb-5 shadow-xl">
-          <MessageSquare size={36} className="text-slate-600" />
+      <div className="h-full flex flex-col items-center justify-center text-center p-8 animate-fade-in relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.03)_0%,transparent_70%)] pointer-events-none" />
+        
+        <div className="w-24 h-24 bg-white/[0.03] border border-white/[0.06] rounded-[2.5rem] flex items-center justify-center mb-8 shadow-2xl relative">
+          <div className="absolute inset-0 bg-indigo-500/10 blur-2xl rounded-full" />
+          <MessageSquare size={42} className="text-indigo-400 relative z-10" />
         </div>
-        <h4 className="text-lg font-bold text-slate-300 mb-2">Encrypted Direct Messaging</h4>
-        <p className="text-sm text-slate-500 max-w-xs leading-relaxed">
-          Select a peer or faculty from the sidebar to start a secure 1-on-1 conversation.
+        
+        <h4 className="text-2xl font-black text-white mb-3 tracking-tight">Direct Messaging Hub</h4>
+        <p className="text-sm text-slate-500 max-w-sm leading-relaxed mb-10">
+          Search for anyone in the institutional registry using their <span className="text-indigo-400 font-bold">PRN, Name, or Email</span> to start a secure conversation.
         </p>
+
+        <button 
+          onClick={() => setIsSearchOpen(true)}
+          className="flex items-center gap-3 px-8 py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black text-sm transition-all shadow-xl shadow-indigo-600/20 active:scale-95"
+        >
+          <Search size={18} />
+          Find New Conversation
+        </button>
+
+        <p className="mt-8 text-[10px] text-slate-700 uppercase tracking-[0.2em] font-black">
+          End-to-End Encrypted · Zero-Trust Privacy
+        </p>
+
+        <UserSearchModal 
+          isOpen={isSearchOpen} 
+          onClose={() => setIsSearchOpen(false)} 
+          onSelect={(u) => setDmTarget(u)} 
+        />
       </div>
     );
   }

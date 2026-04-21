@@ -363,6 +363,56 @@ export function onUsersChange(callback) {
   });
 }
 
+/**
+ * Searches users by PRN, Name, or Email.
+ * Performs parallel queries for exact/prefix matches and merges results.
+ */
+export async function searchUsers(searchTerm) {
+  if (!searchTerm || searchTerm.length < 2) return [];
+  
+  const term = searchTerm.toLowerCase().trim();
+  const usersRef = collection(db, 'users');
+  
+  // Note: Firestore doesn't support native OR queries across different fields easily 
+  // with partial matches without specialized indexing. 
+  // We'll perform a few targeted queries and merge.
+  
+  const queries = [
+    // Exact or prefix match for PRN
+    query(usersRef, where('prn', '==', term)),
+    // Exact match for Email
+    query(usersRef, where('email', '==', term)),
+    // For Name, we can do a range query if we have a searchableName field, 
+    // or we fetch a reasonable batch and filter.
+    // Given 700 users, fetching all names might be OK, but let's try to be smarter.
+    query(usersRef, limit(100)) 
+  ];
+
+  try {
+    const snapshots = await Promise.all(queries.map(q => getDocs(q)));
+    const resultsMap = new Map();
+
+    snapshots.forEach(snap => {
+      snap.forEach(doc => {
+        const data = doc.data();
+        const matches = 
+          data.name?.toLowerCase().includes(term) || 
+          data.prn?.toLowerCase().includes(term) || 
+          data.email?.toLowerCase().includes(term);
+          
+        if (matches) {
+          resultsMap.set(doc.id, { uid: doc.id, ...data });
+        }
+      });
+    });
+
+    return Array.from(resultsMap.values());
+  } catch (err) {
+    console.error('User search failed:', err);
+    return [];
+  }
+}
+
 export async function updateUserStatus(uid, status) {
   if (!uid) return;
   await updateDoc(doc(db, 'users', uid), {

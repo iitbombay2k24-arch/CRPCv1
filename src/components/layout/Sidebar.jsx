@@ -67,6 +67,7 @@ export default function Sidebar() {
   const { channels, activeChannelId, selectChannel } = useChannelStore();
   const { user, setUser, setFirebaseUser } = useAuthStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [realUsers, setRealUsers] = useState([]);
   const [collapsedSections, setCollapsedSections] = useState({});
   const [showDMs, setShowDMs] = useState(true);
@@ -77,6 +78,7 @@ export default function Sidebar() {
 
   useEffect(() => {
     const unsub = onUsersChange((data) => {
+      // We only show a few recent or pinned users if needed, but primary is search
       setRealUsers(data.filter((u) => u.uid !== user?.uid));
     });
     return () => unsub();
@@ -255,36 +257,46 @@ export default function Sidebar() {
 
         {/* Direct Messages */}
         <div className="mt-3 pt-3 border-t border-white/[0.04]">
-          <button
-            onClick={() => setShowDMs(!showDMs)}
-            className="w-full flex items-center justify-between px-3 mb-2"
-          >
+          <div className="flex items-center justify-between px-3 mb-2">
             <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-[0.15em] flex items-center gap-1.5">
               <Users size={9} /> Direct Messages
             </h3>
-            <ChevronDown size={9} className={`text-slate-600 transition-transform duration-200 ${showDMs ? '' : '-rotate-90'}`} />
-          </button>
+            <button 
+              onClick={() => setIsSearchOpen(true)}
+              className="p-1 rounded-lg text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10 transition-all flex items-center gap-1.5"
+            >
+              <Plus size={11} />
+              <span className="text-[10px] font-black uppercase tracking-tighter">New Message</span>
+            </button>
+          </div>
 
-          {showDMs && (
-            <div className="space-y-0.5">
-              {realUsers.slice(0, 8).map((u) => (
-                <button
-                  key={u.uid}
-                  onClick={() => handleDMClick(u)}
-                  className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-[13px] text-slate-400 hover:bg-white/4 hover:text-slate-200 transition-all"
-                >
-                  <Avatar name={u.name} size="xs" status={u.status} />
-                  <span className="truncate">{u.name}</span>
-                  {u.status === 'online' && (
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-auto shrink-0 shadow-[0_0_6px_rgba(52,211,153,0.7)]" />
-                  )}
-                </button>
-              ))}
-              {realUsers.length > 8 && (
-                <p className="text-[10px] text-slate-600 px-3 py-1">+{realUsers.length - 8} more</p>
-              )}
-            </div>
-          )}
+          <div className="space-y-0.5 max-h-[200px] overflow-y-auto custom-scrollbar-slim px-1">
+            {/* Show only top 5 recent/online users to keep list clean */}
+            {realUsers.slice(0, 5).map((u) => (
+              <button
+                key={u.uid}
+                onClick={() => handleDMClick(u)}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] transition-all
+                  ${activeTab === 'dm' && dmTarget?.uid === u.uid 
+                    ? 'bg-indigo-500/10 text-white font-medium border border-indigo-500/20' 
+                    : 'text-slate-500 hover:bg-white/4 hover:text-slate-200'}`}
+              >
+                <Avatar name={u.name} size="xs" status={u.status} />
+                <span className="truncate flex-1 text-left">{u.name}</span>
+                {u.status === 'online' && (
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 shadow-[0_0_6px_rgba(52,211,153,0.7)]" />
+                )}
+              </button>
+            ))}
+            {realUsers.length > 5 && (
+               <button 
+                onClick={() => setIsSearchOpen(true)}
+                className="w-full py-2 text-[10px] text-slate-600 font-bold uppercase tracking-widest hover:text-indigo-400 transition-colors"
+               >
+                 + Search All Users
+               </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -321,6 +333,11 @@ export default function Sidebar() {
       </div>
 
       <CreateChannelModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <UserSearchModal 
+        isOpen={isSearchOpen} 
+        onClose={() => setIsSearchOpen(false)} 
+        onSelect={(u) => handleDMClick(u)} 
+      />
     </aside>
   );
 }
