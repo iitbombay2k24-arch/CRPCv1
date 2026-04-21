@@ -8,7 +8,7 @@ import Badge from '../components/ui/Badge';
 import Avatar from '../components/ui/Avatar';
 import useNotificationStore from '../store/notificationStore';
 import useAuthStore from '../store/authStore';
-import { onChannelMessages, sendMessage } from '../services/firestoreService';
+import { onChannelMessages, sendMessage, onUsersChange } from '../services/firestoreService';
 
 const AMBIENT_SOUNDS = [
   { id: 'rain', name: 'Lofi Rain', track: 'Night Rain in Mumbai', icon: CloudRain, color: 'text-blue-400' },
@@ -23,6 +23,7 @@ export default function GroupStudyPage() {
   const [volume, setVolume] = useState(50);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
+  const [onlineUsers, setOnlineUsers] = useState([]);
   const chatRef = useRef(null);
   const { info } = useNotificationStore();
   const { user } = useAuthStore();
@@ -32,6 +33,14 @@ export default function GroupStudyPage() {
   useEffect(() => {
     const unsub = onChannelMessages(ROOM_ID, (data) => {
       setMessages(data);
+    });
+    return () => unsub();
+  }, []);
+
+  // Real-time online users from Firestore
+  useEffect(() => {
+    const unsub = onUsersChange((users) => {
+      setOnlineUsers(users.filter(u => u.status === 'online').slice(0, 12));
     });
     return () => unsub();
   }, []);
@@ -51,7 +60,7 @@ export default function GroupStudyPage() {
         type: 'channel'
       });
     } catch (err) {
-      console.error(err);
+      console.error('Failed to send study room message:', err);
     }
   };
 
@@ -72,7 +81,9 @@ export default function GroupStudyPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant="success" className="animate-pulse">32 Active Students</Badge>
+          <Badge variant="success" className="animate-pulse">
+            {onlineUsers.length > 0 ? `${onlineUsers.length} Online Now` : 'Loading...'}
+          </Badge>
           <Button onClick={() => info('Voice Connected', 'You have joined the study room audio channel.')} variant="primary" icon={Mic} size="sm">Join Voice</Button>
         </div>
       </div>
@@ -139,19 +150,25 @@ export default function GroupStudyPage() {
              </div>
           </div>
           
-          {/* Active Participants */}
+          {/* Active Participants — real online users */}
           <div className="max-w-2xl mx-auto">
-            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Listening Together Now</h4>
+            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">
+              Online Now ({onlineUsers.length})
+            </h4>
             <div className="flex flex-wrap gap-4">
-              {['Aryan', 'Sakshi', 'Omkar', 'Tanmay', 'Ishani', 'Siddhant'].map((name, i) => (
-                <div key={i} className="flex flex-col items-center gap-1">
-                   <Avatar name={name} size="md" className="border-2 border-emerald-500/20" />
-                   <span className="text-[10px] text-slate-500 font-bold">{name}</span>
+              {onlineUsers.length > 0 ? onlineUsers.slice(0, 6).map((u) => (
+                <div key={u.uid} className="flex flex-col items-center gap-1">
+                   <Avatar name={u.name} src={u.avatar} size="md" className="border-2 border-emerald-500/20" />
+                   <span className="text-[10px] text-slate-500 font-bold">{u.name?.split(' ')[0]}</span>
                 </div>
-              ))}
-              <div className="w-10 h-10 bg-white/[0.02] border border-dashed border-white/10 rounded-full flex items-center justify-center text-slate-600 text-[10px] font-black">
-                +26
-              </div>
+              )) : (
+                <p className="text-xs text-slate-600 italic">No one else is online yet. Invite your classmates!</p>
+              )}
+              {onlineUsers.length > 6 && (
+                <div className="w-10 h-10 bg-white/[0.02] border border-dashed border-white/10 rounded-full flex items-center justify-center text-slate-600 text-[10px] font-black">
+                  +{onlineUsers.length - 6}
+                </div>
+              )}
             </div>
           </div>
         </div>

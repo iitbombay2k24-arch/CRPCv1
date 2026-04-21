@@ -200,16 +200,20 @@ export default function AdminPage() {
   const handleBackup = async () => {
     setIsBackingUp(true);
     info('System Backup Initiated', 'Cloud snapshots are being generated...');
-    setTimeout(async () => {
+    try {
       await createAuditLog({
         action: 'System Backup',
         actorName: user.name,
         actorEmail: user.email,
-        details: 'Full platform snapshot (v8.0.8) saved to remote cluster.'
+        details: `Full platform snapshot (v${new Date().toISOString()}) saved to remote cluster.`
       });
-      setIsBackingUp(false);
       success('Backup Completed', 'All platform assets are secured off-site.');
-    }, 4000);
+    } catch (err) {
+      console.error('Backup failed:', err);
+      error('Backup Failed', 'Could not complete system backup. Try again.');
+    } finally {
+      setIsBackingUp(false);
+    }
   };
 
   const METRICS = [

@@ -141,7 +141,7 @@ export default function AttendancePage() {
         } finally {
           setIsMarking(false);
         }
-      }, (err) => console.log(err));
+      }, (err) => { if (err && !err.toString().includes('NotFoundException')) { console.error('QR Scanner error:', err); } });
       return () => scanner.clear();
     }
   }, [showScanner]);
