@@ -8,7 +8,7 @@ const users = [
   { email: 'alumni@dypiu.ac.in', password: 'password123', name: 'Test Alumni', role: 'Alumni' },
   { email: 'faculty@dypiu.ac.in', password: 'password123', name: 'Test Faculty', role: 'Faculty' },
   { email: 'admin@dypiu.ac.in', password: 'password123', name: 'Test Admin', role: 'Admin' },
-  { email: 'super@dypiu.ac.in', password: 'password123', name: 'System SuperAdmin', role: 'SuperAdmin' },
+  { email: 'super@dypiu.ac.in', password: 'testadmin', name: 'System SuperAdmin', role: 'SuperAdmin' },
   { email: '20240802001@dypiu.ac.in', password: 'password123', name: 'SHARVANI GURUSIDHA GHUGARE', role: 'Student' },
   { email: '20240802002@dypiu.ac.in', password: 'password123', name: 'SWARAJ SACHIN SHASTRI', role: 'Student' },
 ];

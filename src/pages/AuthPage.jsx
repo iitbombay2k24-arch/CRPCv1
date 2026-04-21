@@ -284,7 +284,7 @@ export default function AuthPage() {
                       <div className="flex justify-between"><span>[L5] SuperAdmin:</span> <span className="text-white">super@dypiu.ac.in</span></div>
                     </div>
                     <div className="mt-3 pt-3 border-t border-indigo-500/20 text-center text-[10px] text-indigo-300">
-                      Password for all: <strong className="text-white">123456</strong>
+                      Password: <strong className="text-white">123456</strong> (SuperAdmin: <strong className="text-white">testadmin</strong>)
                     </div>
                   </div>
                   <p className="text-center text-[10px] text-slate-600 leading-relaxed">
