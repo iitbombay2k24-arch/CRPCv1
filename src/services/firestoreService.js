@@ -7,72 +7,79 @@ import {
   collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc,
   query, where, orderBy, limit, onSnapshot, increment, serverTimestamp
 } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../lib/firebase';
+import { db } from '../lib/firebase';
 import { formatTimeAgo } from '../lib/utils';
 import { ROLE_LEVEL } from '../lib/rbac';
 
-// ===================== CHANNELS =====================
+// ===================== CHAT SERVICES =====================
+
+export async function sendMessage({ channelId, text, senderId, senderName, senderRole, type = 'channel' }) {
+  const collectionName = type === 'dm' ? 'dms' : 'channels';
+  const messageRef = collection(db, collectionName, channelId, 'messages');
+  
+  return await addDoc(messageRef, {
+    text,
+    senderId,
+    senderName,
+    senderRole,
+    createdAt: serverTimestamp(),
+    isRead: false
+  });
+}
 
 export function onChannelsChange(callback) {
-  return onSnapshot(collection(db, 'channels'), (snap) => {
+  const q = query(collection(db, 'channels'), orderBy('name', 'asc'));
+  return onSnapshot(q, (snap) => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
 }
 
-export async function createChannel({ name, description, type, category, createdBy }) {
-  const docRef = await addDoc(collection(db, 'channels'), {
-    name,
-    description: description || `Official channel for ${name}`,
-    type: type || 'general',
-    category: category || 'General',
-    isLocked: false,
-    pinnedMessages: [],
-    memberCount: 0,
-    createdBy,
+export async function createChannel(data) {
+  return await addDoc(collection(db, 'channels'), {
+    ...data,
     createdAt: serverTimestamp()
   });
-  return { id: docRef.id, name };
 }
 
-export async function toggleChannelLock(channelId) {
-  const snap = await getDoc(doc(db, 'channels', channelId));
-  if (snap.exists()) {
-    await updateDoc(doc(db, 'channels', channelId), { isLocked: !snap.data().isLocked });
-  }
+export async function uploadFile(file, path) {
+  // Bridge to storageService
+  const { uploadMedia } = await import('./storageService');
+  return await uploadMedia(file, path);
 }
 
-export async function deleteChannel(channelId) {
-  await deleteDoc(doc(db, 'channels', channelId));
+export function onTypingStatusChange(channelId, callback) {
+  const q = query(collection(db, 'typing'), where('channelId', '==', channelId), where('isTyping', '==', true));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => d.data()));
+  });
 }
 
-// ===================== MESSAGING =====================
+export async function setTypingStatus(channelId, userId, isTyping) {
+  const id = `${channelId}_${userId}`;
+  await setDoc(doc(db, 'typing', id), {
+    channelId, userId, isTyping,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+}
 
 export function onChannelMessages(channelId, callback) {
-  const q = query(
-    collection(db, 'channels', channelId, 'messages'),
-    where('parentId', '==', null),
-    orderBy('createdAt', 'asc')
-  );
+  const q = query(collection(db, 'channels', channelId, 'messages'), orderBy('createdAt', 'asc'));
   return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => ({
-      id: d.id, ...d.data(),
-      timestamp: d.data().createdAt?.toDate() || new Date()
-    })));
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+}
+
+export function onThreadMessages(channelId, messageId, callback) {
+  const q = query(collection(db, 'channels', channelId, 'messages', messageId, 'threads'), orderBy('createdAt', 'asc'));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
 }
 
 export function onDMMessages(dmId, callback) {
-  const q = query(
-    collection(db, 'dms', dmId, 'messages'),
-    where('parentId', '==', null),
-    orderBy('createdAt', 'asc')
-  );
+  const q = query(collection(db, 'dms', dmId, 'messages'), orderBy('createdAt', 'asc'));
   return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => ({
-      id: d.id, ...d.data(),
-      timestamp: d.data().createdAt?.toDate() || new Date()
-    })));
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
 }
 
@@ -193,26 +200,30 @@ export async function deleteAnnouncement(id) {
 
 export async function createGrievance({ title, description, authorId, authorName, division, priority, isAnonymous }) {
   return await addDoc(collection(db, 'grievances'), {
-    title, description: description || '',
+    title, 
+    description: description || '',
     authorId: isAnonymous ? null : authorId,
     authorName: isAnonymous ? 'Anonymous Student' : authorName,
     isAnonymous: isAnonymous || false,
-    division, priority: priority || 'Medium',
-    status: 'Open', responses: [],
-    slaDeadline: null, // Set by Cloud Function: createdAt + 72hr
-    createdAt: serverTimestamp(), resolvedAt: null
+    division, 
+    priority: priority || 'Medium',
+    status: 'Submitted', // Submitted, Acknowledged, Resolving, Resolved
+    responses: [],
+    createdAt: serverTimestamp()
   });
 }
-
-
 
 export function onGrievancesChange(callback) {
   const q = query(collection(db, 'grievances'), orderBy('createdAt', 'desc'));
   return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => ({
-      id: d.id, ...d.data(),
-      time: formatTimeAgo(d.data().createdAt?.toDate())
-    })));
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+}
+
+export async function updateGrievanceStatus(id, status) {
+  await updateDoc(doc(db, 'grievances', id), {
+    status,
+    updatedAt: serverTimestamp()
   });
 }
 
@@ -226,8 +237,6 @@ export async function uploadResource({ title, subject, type, fileUrl, fileName, 
     createdAt: serverTimestamp()
   });
 }
-
-
 
 export function onResourcesChange(callback) {
   const q = query(collection(db, 'resources'), orderBy('createdAt', 'desc'));
@@ -245,8 +254,6 @@ export async function createQuestion({ title, body, tags, authorId, authorName }
     answerCount: 0, createdAt: serverTimestamp()
   });
 }
-
-
 
 // ===================== KANBAN BOARD =====================
 
@@ -316,19 +323,6 @@ export async function deleteTimetableSlot(id) {
   await deleteDoc(doc(db, 'timetable', id));
 }
 
-// ===================== GLOBAL STATS =====================
-
-export async function getGlobalStats() {
-  const usersSnap = await getDocs(collection(db, 'users'));
-  const channelsSnap = await getDocs(collection(db, 'channels'));
-  const resourcesSnap = await getDocs(collection(db, 'resources'));
-  return {
-    totalUsers: usersSnap.size,
-    activeChannels: channelsSnap.size,
-    totalResources: resourcesSnap.size,
-  };
-}
-
 // ===================== QUIZZES =====================
 
 export async function createQuiz(quizData) {
@@ -350,6 +344,7 @@ export async function submitQuizResult({ quizId, studentId, studentName, score, 
   return await addDoc(collection(db, 'quizzes', quizId, 'results'), {
     studentId, studentName, score, total, submittedAt: serverTimestamp()
   });
+  return docRef.id;
 }
 
 export function onQuizSubmissions(quizId, callback) {
@@ -360,7 +355,22 @@ export function onQuizSubmissions(quizId, callback) {
   });
 }
 
-// ===================== USERS =====================
+export async function markNotificationAsRead(userId, notificationId) {
+  if (!userId || !notificationId) return;
+  await updateDoc(doc(db, 'users', userId, 'notifications', notificationId), {
+    isRead: true
+  });
+}
+
+export async function clearAllNotifications(userId) {
+  if (!userId) return;
+  const q = query(collection(db, 'users', userId, 'notifications'), where('isRead', '==', true));
+  const snap = await getDocs(q);
+  const batchRequests = snap.docs.map(d => deleteDoc(d.ref));
+  await Promise.all(batchRequests);
+}
+
+// ===================== USERS & SEARCH =====================
 
 export function onUsersChange(callback) {
   return onSnapshot(collection(db, 'users'), (snap) => {
@@ -376,49 +386,95 @@ export async function updateUserStatus(uid, status) {
   });
 }
 
-// ===================== NOTIFICATIONS =====================
+export async function updateUserStreak(uid) {
+  if (!uid) return;
+  const userRef = doc(db, 'users', uid);
+  const snap = await getDoc(userRef);
+  if (!snap.exists()) return;
+  
+  const data = snap.data();
+  const lastUpdate = data.lastStreakUpdate?.toDate() || new Date(0);
+  const now = new Date();
+  
+  // Allow incrementing streak if the last update wasn't today
+  if (lastUpdate.toDateString() !== now.toDateString()) {
+    await updateDoc(userRef, {
+      streak: increment(1),
+      lastStreakUpdate: serverTimestamp(),
+      engagementScore: increment(5) // Bonus for daily login
+    });
+  }
+}
 
-export function onNotificationsChange(userId, callback) {
-  if (!userId) return () => {};
-  const q = query(
-    collection(db, 'users', userId, 'notifications'), 
-    orderBy('createdAt', 'desc'),
-    limit(50)
-  );
-  return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+export async function updateUserRole(uid, role, roleLevel) {
+  await updateDoc(doc(db, 'users', uid), {
+    role,
+    roleLevel,
+    updatedAt: serverTimestamp()
   });
 }
 
+// ===================== TASK 9: VIRTUALIZATION & PAGINATION =====================
 
-
-export async function createNotification(userId, { title, body, type, metadata }) {
-  await addDoc(collection(db, 'users', userId, 'notifications'), {
-    title, body, type, metadata: metadata || {},
-    isRead: false,
-    createdAt: serverTimestamp()
-  });
+export async function getUsersPaginated(pageSize = 20, lastDoc = null) {
+  const usersRef = collection(db, 'users');
+  let q;
+  
+  if (lastDoc) {
+    q = query(usersRef, orderBy('name'), startAfter(lastDoc), limit(pageSize));
+  } else {
+    q = query(usersRef, orderBy('name'), limit(pageSize));
+  }
+  
+  const snap = await getDocs(q);
+  return {
+    users: snap.docs.map(d => ({ id: d.id, ...d.data() })),
+    lastVisible: snap.docs[snap.docs.length - 1]
+  };
 }
 
-// ===================== GLOBAL STATS (REAL TIME) =====================
+export async function getMessagesPaginated(channelId, pageSize = 30, lastDoc = null) {
+  const msgRef = collection(db, 'channels', channelId, 'messages');
+  let q;
+  
+  if (lastDoc) {
+    q = query(msgRef, orderBy('createdAt', 'desc'), startAfter(lastDoc), limit(pageSize));
+  } else {
+    q = query(msgRef, orderBy('createdAt', 'desc'), limit(pageSize));
+  }
+  
+  const snap = await getDocs(q);
+  return {
+    messages: snap.docs.map(d => ({ id: d.id, ...d.data() })),
+    lastVisible: snap.docs[snap.docs.length - 1]
+  };
+}
+
+// ===================== ADMIN ANALYTICS & PLACEMENTS =====================
 
 export function onGlobalStatsChange(callback) {
-  // Composite listener for high-level stats
-  const unsubUsers = onSnapshot(collection(db, 'users'), (uSnap) => {
-    const unsubChannels = onSnapshot(collection(db, 'channels'), (cSnap) => {
-      const unsubResources = onSnapshot(collection(db, 'resources'), (rSnap) => {
-        callback({
-          totalUsers: uSnap.size,
-          activeChannels: cSnap.size,
-          totalResources: rSnap.size,
-          lastUpdated: new Date()
-        });
-      });
-      return unsubResources;
-    });
-    return unsubChannels;
+  let stats = { totalUsers: 0, activeChannels: 0, totalResources: 0 };
+  
+  const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
+    stats.totalUsers = snap.size;
+    callback({ ...stats });
   });
-  return unsubUsers;
+
+  const unsubChannels = onSnapshot(collection(db, 'channels'), (snap) => {
+    stats.activeChannels = snap.size;
+    callback({ ...stats });
+  });
+
+  const unsubResources = onSnapshot(collection(db, 'resources'), (snap) => {
+    stats.totalResources = snap.size;
+    callback({ ...stats });
+  });
+
+  return () => {
+    unsubUsers();
+    unsubChannels();
+    unsubResources();
+  };
 }
 
 // ===================== DM READ RECEIPTS =====================
@@ -696,6 +752,7 @@ export async function seedInitialTasks() {
       createdAt: serverTimestamp()
     });
   }
+  return count;
 }
 
 // ===================== AUDIT LOGS =====================
@@ -708,11 +765,7 @@ export async function createAuditLog({ action, actorName, actorEmail, details })
 }
 
 export function onAuditLogChange(callback) {
-  const q = query(
-    collection(db, 'auditLogs'),
-    orderBy('timestamp', 'desc'),
-    limit(100)
-  );
+  const q = query(collection(db, 'auditLogs'), orderBy('timestamp', 'desc'), limit(100));
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map(d => ({ 
       id: d.id, ...d.data(),
@@ -723,14 +776,16 @@ export function onAuditLogChange(callback) {
 
 // ===================== INTERVIEW EXPERIENCES =====================
 
-export function onInterviewExperiencesChange(callback) {
-  const q = query(collection(db, 'interviewExperiences'), orderBy('createdAt', 'desc'));
-  return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => ({
-      id: d.id, ...d.data(),
-      date: formatTimeAgo(d.data().createdAt?.toDate())
-    })));
-  });
+export async function markDMAsRead(senderId, receiverId) {
+  const dmId = [senderId, receiverId].sort().join('_');
+  const q = query(
+    collection(db, 'dms', dmId, 'messages'), 
+    where('senderId', '==', receiverId),
+    where('isRead', '==', false)
+  );
+  const snap = await getDocs(q);
+  const batch = snap.docs.map(d => updateDoc(d.ref, { isRead: true, readAt: serverTimestamp() }));
+  await Promise.all(batch);
 }
 
 export async function postInterviewExperience({ company, role, fullText, tags, authorId, authorName }) {

@@ -278,7 +278,49 @@ exports.processQuizSubmission = functions.firestore
     });
   });
 
+/**
+ * Trigger: Every Sunday at 8 PM (Task 10)
+ * Action: Aggregate upcoming activity and notify students
+ */
+exports.weeklyDigestSchedule = functions.pubsub
+  .schedule('0 20 * * 0') // Sunday 20:00 (8 PM)
+  .timeZone('Asia/Kolkata')
+  .onRun(async (context) => {
+    // 1. Fetch upcoming Quizzes
+    const quizSnap = await db.collection('quizzes')
+      .where('active', '==', true)
+      .limit(5)
+      .get();
+    
+    // 2. Fetch upcoming Placement Drives
+    const driveSnap = await db.collection('placementDrives')
+      .where('status', '==', 'Open')
+      .limit(5)
+      .get();
 
+    const quizTitles = quizSnap.docs.map(d => d.data().title).join(', ');
+    const driveCompanies = driveSnap.docs.map(d => d.data().company).join(', ');
 
+    const body = `Week Ahead: ${quizSnap.size} Quizzes (${quizTitles}) and ${driveSnap.size} Placement Drives (${driveCompanies}) are active!`;
 
+    // 3. Notify all Active Users
+    const usersSnap = await db.collection('users')
+      .where('isGhost', '==', false)
+      .get();
 
+    const batch = db.batch();
+    usersSnap.forEach(userDoc => {
+      const notifRef = userDoc.ref.collection('notifications').doc();
+      batch.set(notifRef, {
+        title: 'Your Weekly Institutional Digest',
+        body,
+        type: 'WEEKLY_DIGEST',
+        isRead: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+    });
+
+    await batch.commit();
+    console.log(`Weekly Digest sent to ${usersSnap.size} users.`);
+    return null;
+  });

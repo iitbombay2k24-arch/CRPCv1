@@ -66,23 +66,37 @@ service cloud.firestore {
       }
     }
 
-    // ---- CHANNELS ----
-    match /channels/{channelId} {
-      allow read: if isSecured();
-      allow create: if isSecured() && userRole() in ['Faculty', 'Admin', 'SuperAdmin'];
-      allow update, delete: if isSecured() && userRole() in ['Admin', 'SuperAdmin'];
+    function isAdmin() {
+      return isSecured() && (
+        request.auth.token.roleLevel >= 3 ||
+        isSuperAdmin() ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roleLevel >= 3)
+      );
+    }
 
-      match /messages/{messageId} {
-        allow read: if isSecured();
-        allow create: if isSecured();
-        allow update: if isSecured() && (
-          request.auth.uid == resource.data.senderId ||
-          userRole() in ['Faculty', 'Admin', 'SuperAdmin']
+    function isFaculty() {
+        return isSecured() && (
+            isAdmin() || 
+            (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roleLevel >= 2)
         );
-        allow delete: if isSecured() && (
-          request.auth.uid == resource.data.senderId ||
-          userRole() in ['Admin', 'SuperAdmin']
-        );
+    }
+
+    // ---- COLLECTIONS ----
+
+    match /users/{uid} {
+      allow read: if isSecured();
+      allow create: if isSecured() && request.auth.uid == uid 
+        && request.resource.data.roleLevel == 1; // Default to Student
+      allow update: if isSecured() && (
+        (request.auth.uid == uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'roleLevel', 'prn'])) ||
+        isAdmin()
+      );
+      allow delete: if isSuperAdmin();
+
+      match /{allSubcollections=**} {
+        allow read, write: if isSecured() && (request.auth.uid == uid || isAdmin());
       }
     }
 
@@ -180,8 +194,7 @@ service cloud.firestore {
       }
     }
 
-    // ---- PLACEMENT DRIVES ----
-    match /placementDrives/{driveId} {
+    match /announcements/{id} {
       allow read: if isSecured();
       allow write: if isSecured() && userRole() in ['Admin', 'SuperAdmin'];
 

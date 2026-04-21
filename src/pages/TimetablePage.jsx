@@ -34,6 +34,16 @@ export default function TimetablePage() {
   const canEdit = hasPermission(user.role, 'CREATE_TIMETABLE');
   const handleDelete = async (id) => { if (window.confirm('Remove this slot?')) await deleteTimetableSlot(id); };
 
+  const getGoogleCalendarLink = (slot) => {
+    const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    const startTime = slot.timeStart.replace(/:/g, '') + '00';
+    const endTime = slot.timeEnd.replace(/:/g, '') + '00';
+    const text = encodeURIComponent(`DYPIU: ${slot.subject} (${slot.type})`);
+    const details = encodeURIComponent(`Faculty: ${slot.faculty}\nRoom: ${slot.room}\nMode: ${slot.mode}`);
+    const location = encodeURIComponent(slot.room || 'DYPIU Campus');
+    return `https://www.google.com/calendar/render?action=TEMPLATE&text=${text}&details=${details}&location=${location}&dates=${todayStr}T${startTime}/${todayStr}T${endTime}`;
+  };
+
   const filteredSlots = slots
     .filter((s) => s.day === selectedDay)
     .sort((a, b) => a.timeStart.localeCompare(b.timeStart));
@@ -100,7 +110,7 @@ export default function TimetablePage() {
             filteredSlots.map((slot) => (
               <div
                 key={slot.id}
-                className="glass-card rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-5 group relative"
+                className="glass-card rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center gap-5 group relative overflow-hidden"
               >
                 {/* Left: Time */}
                 <div className="flex flex-row sm:flex-col items-center sm:items-center justify-start sm:justify-center sm:min-w-[100px] sm:bg-white/[0.03] sm:border sm:border-white/[0.06] sm:rounded-2xl sm:py-3 px-0 sm:px-2 gap-3 sm:gap-0.5">
@@ -126,14 +136,25 @@ export default function TimetablePage() {
                   </div>
                 </div>
 
-                {canEdit && (
-                  <button
-                    onClick={() => handleDelete(slot.id)}
-                    className="absolute top-4 right-4 p-2 text-slate-700 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                <div className="flex flex-col gap-2">
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="text-[10px] px-3 py-1.5 border border-white/5 opacity-40 group-hover:opacity-100 hover:border-indigo-500/30 transition-all"
+                    icon={Calendar}
+                    onClick={() => window.open(getGoogleCalendarLink(slot), '_blank')}
                   >
-                    <Trash2 size={16} />
-                  </button>
-                )}
+                    Sync to GV
+                  </Button>
+                  {canEdit && (
+                    <button
+                      onClick={() => handleDelete(slot.id)}
+                      className="p-1.5 text-slate-700 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all self-end"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
               </div>
             ))
           )}

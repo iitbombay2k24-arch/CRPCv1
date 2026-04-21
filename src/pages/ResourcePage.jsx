@@ -10,6 +10,8 @@ import { formatFileSize, formatTimeAgo } from '../lib/utils';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import UploadResourceModal from '../modals/UploadResourceModal';
+import CreateSyllabusModal from '../modals/CreateSyllabusModal';
+import CreateCourseArchiveModal from '../modals/CreateCourseArchiveModal';
 import Spinner from '../components/ui/Spinner';
 
 const TYPE_CONFIG = {
@@ -30,6 +32,8 @@ export default function ResourcePage() {
   const { user } = useAuthStore();
   const [resources, setResources] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSyllabusModalOpen, setIsSyllabusModalOpen] = useState(false);
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('All');
@@ -201,6 +205,8 @@ export default function ResourcePage() {
       </div>
 
       <UploadResourceModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <CreateSyllabusModal isOpen={isSyllabusModalOpen} onClose={() => setIsSyllabusModalOpen(false)} />
+      <CreateCourseArchiveModal isOpen={isArchiveModalOpen} onClose={() => setIsArchiveModalOpen(false)} />
     </div>
   );
 }

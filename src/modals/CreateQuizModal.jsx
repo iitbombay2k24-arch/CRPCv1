@@ -22,12 +22,13 @@ export default function CreateQuizModal({ isOpen, onClose }) {
   const [description, setDescription] = useState('');
   const [duration, setDuration] = useState(15);
   const [questions, setQuestions] = useState([
-    { question: '', options: ['', '', '', ''], correctAnswer: 0 }
+    { id: 'q1', question: '', options: ['', '', '', ''], correctOption: 0, points: 10 }
   ]);
   const [isLoading, setIsLoading] = useState(false);
 
   const addQuestion = () => {
-    setQuestions([...questions, { question: '', options: ['', '', '', ''], correctAnswer: 0 }]);
+    const newId = 'q' + (questions.length + 1) + '_' + Math.random().toString(36).substr(2, 5);
+    setQuestions([...questions, { id: newId, question: '', options: ['', '', '', ''], correctOption: 0, points: 10 }]);
   };
 
   const removeQuestion = (idx) => {
@@ -62,7 +63,7 @@ export default function CreateQuizModal({ isOpen, onClose }) {
         questions
       });
       setTitle('');
-      setQuestions([{ question: '', options: ['', '', '', ''], correctAnswer: 0 }]);
+      setQuestions([{ id: 'q1', question: '', options: ['', '', '', ''], correctOption: 0, points: 10 }]);
       onClose();
     } catch (error) {
       console.error('Error creating quiz:', error);
@@ -172,9 +173,9 @@ export default function CreateQuizModal({ isOpen, onClose }) {
                               <div key={oIdx} className="flex items-center gap-3">
                                  <button 
                                    type="button"
-                                   onClick={() => updateQuestion(qIdx, 'correctAnswer', oIdx)}
+                                   onClick={() => updateQuestion(qIdx, 'correctOption', oIdx)}
                                    className={`w-10 h-10 rounded-xl flex items-center justify-center font-black transition-all border
-                                      ${q.correctAnswer === oIdx 
+                                      ${q.correctOption === oIdx 
                                         ? 'bg-emerald-600 border-emerald-400 text-white shadow-lg shadow-emerald-600/20' 
                                         : 'bg-slate-900 border-slate-700/50 text-slate-600'}`}
                                  >

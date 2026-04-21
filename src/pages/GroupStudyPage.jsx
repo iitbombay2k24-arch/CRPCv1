@@ -36,7 +36,11 @@ export default function GroupStudyPage() {
   const [isSending, setIsSending] = useState(false);
   const [isLoadingChat, setIsLoadingChat] = useState(true);
   const chatRef = useRef(null);
-  const { info } = useNotificationStore();
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const streamRef = useRef(null);
+  const animationRef = useRef(null);
+  const { info, error } = useNotificationStore();
   const { user } = useAuthStore();
 
   // Join presence on mount, leave on unmount
