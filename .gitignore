@@ -42,3 +42,4 @@ serviceaccountkey.json
 
 # Nested repo clone — not a submodule, exclude entirely
 /CRPCv1/
+*.xlsx

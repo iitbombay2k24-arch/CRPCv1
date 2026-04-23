@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Menu, X, Bell, Search, MoreVertical, Hash,
-  Video, Phone, LayoutGrid
+  Video, Phone, LayoutGrid, Clock
 } from 'lucide-react';
 import useUIStore from '../../store/uiStore';
 import useChannelStore from '../../store/channelStore';
