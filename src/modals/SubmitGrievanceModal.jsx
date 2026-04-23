@@ -5,7 +5,8 @@ import {
   Lock, 
   Send,
   Flag,
-  Globe
+  Globe,
+  Info
 } from 'lucide-react';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -15,6 +16,7 @@ import { createGrievance } from '../services/firestoreService';
 export default function SubmitGrievanceModal({ isOpen, onClose }) {
   const { user } = useAuthStore();
   const [title, setTitle] = useState('');
+  const [category, setCategory] = useState('Academic');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('Medium');
   const [division, setDivision] = useState(user.division || 'Division A');
@@ -23,6 +25,7 @@ export default function SubmitGrievanceModal({ isOpen, onClose }) {
 
   const priorities = ['Low', 'Medium', 'High'];
   const divisions = ['Division A', 'Division B', 'All'];
+  const categories = ['Academic', 'Infrastructure', 'Harassment', 'Financial', 'Hostel', 'Other'];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,12 +35,14 @@ export default function SubmitGrievanceModal({ isOpen, onClose }) {
     try {
       await createGrievance({
         title: title.trim(),
+        category,
         description: description.trim(),
         authorId: user.uid,
         authorName: user.name,
         division,
         priority,
-        isAnonymous
+        isAnonymous,
+        status: 'Pending'
       });
       setTitle('');
       setDescription('');
@@ -107,36 +112,51 @@ export default function SubmitGrievanceModal({ isOpen, onClose }) {
            </div>
 
            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Priority */}
+              {/* Category */}
               <div>
-                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Priority Level</label>
-                 <div className="flex gap-2">
-                    {priorities.map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => setPriority(p)}
-                        className={`flex-1 py-2 rounded-xl border text-xs font-bold transition-all
-                          ${priority === p 
-                            ? 'bg-rose-600 border-rose-500 text-white shadow-lg shadow-rose-600/20' 
-                            : 'bg-slate-900 border-slate-800 text-slate-600 hover:border-slate-700 hover:text-slate-300'}`}
-                      >
-                        {p}
-                      </button>
-                    ))}
+                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Category</label>
+                 <div className="relative group">
+                   <Info size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-indigo-400" />
+                   <select 
+                     value={category}
+                     onChange={(e) => setCategory(e.target.value)}
+                     className="w-full bg-slate-900 border border-slate-700/50 rounded-xl py-2.5 pl-10 pr-4 text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-all text-sm appearance-none"
+                   >
+                     {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                   </select>
                  </div>
               </div>
 
               {/* Division */}
               <div>
-                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Relevant Division</label>
+                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Relevant Division</label>
                  <select 
                    value={division}
                    onChange={(e) => setDivision(e.target.value)}
-                   className="w-full bg-slate-900 border border-slate-700/50 rounded-xl py-2 px-4 text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-all text-sm appearance-none"
+                   className="w-full bg-slate-900 border border-slate-700/50 rounded-xl py-2.5 px-4 text-slate-200 focus:outline-none focus:border-indigo-500/50 transition-all text-sm appearance-none"
                  >
                    {divisions.map(d => <option key={d} value={d}>{d}</option>)}
                  </select>
+              </div>
+           </div>
+
+           {/* Priority */}
+           <div>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Priority Level</label>
+              <div className="flex gap-2">
+                 {priorities.map((p) => (
+                   <button
+                     key={p}
+                     type="button"
+                     onClick={() => setPriority(p)}
+                     className={`flex-1 py-2 rounded-xl border text-xs font-bold transition-all
+                       ${priority === p 
+                         ? 'bg-rose-600 border-rose-500 text-white shadow-lg shadow-rose-600/20' 
+                         : 'bg-slate-900 border-slate-800 text-slate-600 hover:border-slate-700 hover:text-slate-300'}`}
+                   >
+                     {p}
+                   </button>
+                 ))}
               </div>
            </div>
         </div>

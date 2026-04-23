@@ -85,6 +85,21 @@ service cloud.firestore {
 
     // ---- COLLECTIONS ----
 
+    // ---- CHANNELS ----
+    match /channels/{channelId} {
+      allow read: if isSecured();
+      allow create: if isSecured() && (userRole() in ['Admin', 'SuperAdmin']);
+      allow update: if isSecured() && (userRole() in ['Admin', 'SuperAdmin']);
+      allow delete: if isSecured() && (userRole() in ['Admin', 'SuperAdmin']);
+
+      match /messages/{messageId} {
+        allow read: if isSecured();
+        allow create: if isSecured();
+        allow update: if isSecured() && (request.auth.uid == resource.data.senderId || isAdmin());
+        allow delete: if isSecured() && (request.auth.uid == resource.data.senderId || isAdmin());
+      }
+    }
+
     match /users/{uid} {
       allow read: if isSecured();
       allow create: if isSecured() && request.auth.uid == uid 

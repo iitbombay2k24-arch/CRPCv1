@@ -12,10 +12,13 @@ import Avatar from '../components/ui/Avatar';
 import Badge from '../components/ui/Badge';
 import Spinner from '../components/ui/Spinner';
 import ThreadPanel from '../components/chat/ThreadPanel';
+import { moderateMessage } from '../services/moderationService';
+import useNotificationStore from '../store/notificationStore';
+import { logModerationEvent } from '../services/firestoreService';
 
 export default function ChatPage() {
   const { user } = useAuthStore();
-  const { activeChannel, channels, getActiveChannelId } = useChannelStore();
+  const { activeChannelId, channels, channelsData, selectChannel } = useChannelStore();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -27,10 +30,7 @@ export default function ChatPage() {
   const fileInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
-  const activeChannelId = getActiveChannelId();
-  const channelData = channels.find((c) => c === activeChannel)
-    ? { name: activeChannel }
-    : { name: 'general', description: 'Main discussion channel' };
+  const channelData = channelsData[activeChannelId] || { name: 'general', description: 'Main discussion channel' };
 
   const handleBookmark = async (msg) => await toggleBookmark(user.uid, msg);
 
@@ -51,7 +51,7 @@ export default function ChatPage() {
       unsubMsgs();
       unsubTyping();
     };
-  }, [activeChannel, activeChannelId, user.uid]);
+  }, [activeChannelId, user.uid]);
 
   const handleTyping = () => {
     if (!activeChannelId || !user) return;
@@ -92,11 +92,29 @@ export default function ChatPage() {
   const handleSend = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || isSending) return;
+    
+    // Moderation check
+    const { cleanText, isBlocked, reason } = moderateMessage(newMessage.trim());
+    
+    if (isBlocked) {
+      useNotificationStore.getState().warning(reason, 'Message Blocked');
+      logModerationEvent({
+        userId: user.uid,
+        userName: user.name,
+        userEmail: user.email,
+        text: newMessage.trim(),
+        reason,
+        location: `channel:${activeChannelId}`,
+        type: 'block'
+      });
+      return;
+    }
+
     setIsSending(true);
     try {
       await sendMessage({
         channelId: activeChannelId,
-        text: newMessage.trim(),
+        text: cleanText,
         senderId: user.uid,
         senderName: user.name,
         senderEmail: user.email,
@@ -109,7 +127,7 @@ export default function ChatPage() {
     }
   };
 
-  if (!activeChannel) {
+  if (!activeChannelId) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-8">
         <div className="text-center animate-fade-in space-y-4">

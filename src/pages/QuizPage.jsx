@@ -13,6 +13,8 @@ import Button from '../components/ui/Button';
 import CreateQuizModal from '../modals/CreateQuizModal';
 import Avatar from '../components/ui/Avatar';
 import Spinner from '../components/ui/Spinner';
+import confetti from 'canvas-confetti';
+import { getDocs, collection, query, orderBy, limit } from 'firebase/firestore';
 
 export default function QuizPage() {
   const { user } = useAuthStore();
@@ -25,6 +27,8 @@ export default function QuizPage() {
   const [isFinished, setIsFinished] = useState(false);
   const [isGrading, setIsGrading] = useState(false);
   const [result, setResult] = useState(null);
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [showReview, setShowReview] = useState(false);
 
   // Use refs to track mutable quiz state without stale closures
   const answersRef = useRef({});
@@ -35,8 +39,31 @@ export default function QuizPage() {
 
   useEffect(() => {
     const unsub = onQuizzesChange((data) => { setQuizzes(data); setIsLoading(false); });
+    
+    // Fetch Global Leaderboard
+    const fetchLeaderboard = async () => {
+      try {
+        const q = query(collection(db, 'users'), orderBy('engagementScore', 'desc'), limit(5));
+        const snap = await getDocs(q);
+        setLeaderboard(snap.docs.map(d => ({ uid: d.id, ...d.data() })));
+      } catch (e) { console.error('Leaderboard error:', e); }
+    };
+    fetchLeaderboard();
+
     return () => unsub();
   }, []);
+
+  // Trigger Confetti on High Score
+  useEffect(() => {
+    if (result && result.percentage >= 80) {
+      confetti({
+        particleCount: 150,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#6366f1', '#a855f7', '#ec4899', '#f59e0b']
+      });
+    }
+  }, [result]);
 
   const stopTimer = useCallback(() => {
     if (timerRef.current) {
@@ -81,6 +108,7 @@ export default function QuizPage() {
               score: data.score,
               total: data.totalPossible,
               percentage: parseFloat(data.percentage),
+              breakdown: data.breakdown || null, // Detailed Q&A results
               timeTaken,
               tabSwitches
             });
@@ -255,9 +283,44 @@ export default function QuizPage() {
             ))}
           </div>
 
-          <Button variant="primary" className="w-full" onClick={() => { setActiveQuiz(null); setIsFinished(false); setResult(null); }}>
-            Back to Quizzes
-          </Button>
+          <div className="flex gap-3">
+             <Button variant="primary" className="flex-1" onClick={() => { setActiveQuiz(null); setIsFinished(false); setResult(null); }}>
+               Back to Quizzes
+             </Button>
+             {result.breakdown && (
+                <Button variant="ghost" className="flex-1 border-white/10" onClick={() => setShowReview(!showReview)}>
+                   {showReview ? 'Hide Review' : 'Review Answers'}
+                </Button>
+             )}
+          </div>
+
+          {showReview && result.breakdown && (
+             <div className="mt-8 text-left space-y-4 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+                {activeQuiz.questions.map((q, i) => {
+                   const userAnswerIdx = result.breakdown[q.id || i]?.userAnswer;
+                   const correctAnswerIdx = result.breakdown[q.id || i]?.correctAnswer;
+                   const isCorrect = userAnswerIdx === correctAnswerIdx;
+
+                   return (
+                      <div key={i} className={`p-4 rounded-2xl border ${isCorrect ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'}`}>
+                         <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Question {i + 1}</p>
+                         <p className="text-sm font-bold text-white mb-3">{q.question}</p>
+                         <div className="space-y-2">
+                            <div className={`p-2.5 rounded-xl text-xs flex items-center justify-between ${isCorrect ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                               <span>Your Answer: {q.options[userAnswerIdx] || 'No Answer'}</span>
+                               {isCorrect ? <CheckCircle2 size={14} /> : <ShieldAlert size={14} />}
+                            </div>
+                            {!isCorrect && (
+                               <div className="p-2.5 rounded-xl text-xs bg-emerald-500/10 text-emerald-400">
+                                  Correct Answer: {q.options[correctAnswerIdx]}
+                               </div>
+                            )}
+                         </div>
+                      </div>
+                   );
+                })}
+             </div>
+          )}
         </div>
       </div>
     );
@@ -398,72 +461,132 @@ export default function QuizPage() {
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-7">
-        {isLoading ? (
-          <div className="h-64 flex items-center justify-center"><Spinner size="lg" /></div>
-        ) : quizzes.length === 0 ? (
-          <div className="h-64 flex flex-col items-center justify-center text-center border border-dashed border-white/[0.06] rounded-3xl">
-            <AlertCircle size={40} className="text-slate-700 mb-3" />
-            <p className="text-slate-400 font-semibold">No Active Quizzes</p>
-            <p className="text-slate-600 text-sm">New quizzes will appear here when created by Faculty.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {quizzes.map((quiz) => (
-              <div
-                key={quiz.id}
-                className="glass-card rounded-3xl p-6 flex flex-col relative overflow-hidden group"
-              >
-                {/* BG glow */}
-                <div className="absolute -top-8 -right-8 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
+      <div className="flex-1 overflow-hidden flex flex-col lg:flex-row p-7 gap-7">
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
+          {isLoading ? (
+            <div className="h-64 flex items-center justify-center"><Spinner size="lg" /></div>
+          ) : quizzes.length === 0 ? (
+            <div className="h-64 flex flex-col items-center justify-center text-center border border-dashed border-white/[0.06] rounded-3xl">
+              <AlertCircle size={40} className="text-slate-700 mb-3" />
+              <p className="text-slate-400 font-semibold">No Active Quizzes</p>
+              <p className="text-slate-600 text-sm">New quizzes will appear here when created by Faculty.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {quizzes.map((quiz) => (
+                <div
+                  key={quiz.id}
+                  className="glass-card rounded-3xl p-6 flex flex-col relative overflow-hidden group"
+                >
+                  {/* BG glow */}
+                  <div className="absolute -top-8 -right-8 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
 
-                <div className="flex items-start justify-between mb-6">
-                  <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-center text-amber-400 shrink-0 group-hover:scale-110 transition-transform">
-                    <Trophy size={24} />
-                  </div>
-                  <div className="flex flex-col items-end gap-1.5">
-                    <Badge variant="warning" size="xs" dot>Active</Badge>
-                    <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
-                      <Clock size={11} /> {quiz.duration} min
+                  <div className="flex items-start justify-between mb-6">
+                    <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-center text-amber-400 shrink-0 group-hover:scale-110 transition-transform">
+                      <Trophy size={24} />
                     </div>
-                    <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
-                      <BarChart2 size={11} /> {quiz.questions?.length || 0} Qs
+                    <div className="flex flex-col items-end gap-1.5">
+                      <Badge variant="warning" size="xs" dot>Active</Badge>
+                      <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
+                        <Clock size={11} /> {quiz.duration} min
+                      </div>
+                      <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
+                        <BarChart2 size={11} /> {quiz.questions?.length || 0} Qs
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex-1">
-                  <h3 className="text-lg font-black text-white mb-1.5 leading-tight uppercase tracking-tight">
-                    {quiz.title}
-                  </h3>
-                  <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest bg-indigo-500/10 inline-block px-2 py-0.5 rounded-lg mb-3">
-                    {quiz.subject}
-                  </p>
-                  <p className="text-sm text-slate-400 line-clamp-2 leading-relaxed">
-                    {quiz.description}
-                  </p>
-                </div>
-
-                <div className="mt-5 pt-4 border-t border-white/[0.05] space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Avatar name={quiz.authorName || 'F'} size="xs" />
-                    <span className="text-[10px] text-slate-500 font-bold">
-                      {quiz.authorName || 'Faculty'}
-                    </span>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-black text-white mb-1.5 leading-tight uppercase tracking-tight">
+                      {quiz.title}
+                    </h3>
+                    <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest bg-indigo-500/10 inline-block px-2 py-0.5 rounded-lg mb-3">
+                      {quiz.subject}
+                    </p>
+                    <p className="text-sm text-slate-400 line-clamp-2 leading-relaxed">
+                      {quiz.description}
+                    </p>
                   </div>
-                  <Button
-                    variant="primary"
-                    icon={Play}
-                    className="w-full"
-                    onClick={() => startQuiz(quiz)}
-                  >
-                    Start Quiz
-                  </Button>
+
+                  <div className="mt-5 pt-4 border-t border-white/[0.05] space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Avatar name={quiz.authorName || 'F'} size="xs" />
+                      <span className="text-[10px] text-slate-500 font-bold">
+                        {quiz.authorName || 'Faculty'}
+                      </span>
+                    </div>
+                    <Button
+                      variant="primary"
+                      icon={Play}
+                      className="w-full"
+                      onClick={() => startQuiz(quiz)}
+                    >
+                      Start Quiz
+                    </Button>
+                  </div>
                 </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Global Leaderboard Sidebar */}
+        <div className="w-full lg:w-80 shrink-0">
+           <div className="glass-card rounded-3xl p-6 h-full border border-white/[0.06] bg-gradient-to-b from-indigo-500/[0.02] to-transparent">
+              <div className="flex items-center gap-3 mb-6">
+                 <Star className="text-amber-400 fill-amber-400" size={18} />
+                 <h3 className="font-black text-xs text-white uppercase tracking-widest">Global Top Performers</h3>
               </div>
-            ))}
-          </div>
-        )}
+
+              <div className="space-y-4">
+                 {leaderboard.map((u, i) => (
+                    <div key={u.uid} className="flex items-center justify-between group">
+                       <div className="flex items-center gap-3">
+                          <div className={`
+                             w-6 h-6 rounded-lg flex items-center justify-center font-black text-[10px]
+                             ${i === 0 ? 'bg-amber-400 text-amber-900 shadow-lg shadow-amber-400/20' : 
+                               i === 1 ? 'bg-slate-300 text-slate-800' : 
+                               i === 2 ? 'bg-orange-400 text-orange-900' : 'bg-white/5 text-slate-500'}
+                          `}>
+                             {i + 1}
+                          </div>
+                          <Avatar name={u.name} size="xs" />
+                          <div className="min-w-0">
+                             <p className="text-xs font-bold text-slate-200 truncate group-hover:text-indigo-400 transition-colors">{u.name}</p>
+                             <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest">{u.branch || 'DYPIU Student'}</p>
+                          </div>
+                       </div>
+                       <div className="text-right">
+                          <p className="text-xs font-black text-indigo-400 tracking-tighter">{u.engagementScore}</p>
+                          <p className="text-[8px] text-slate-700 font-black uppercase tracking-widest">XP</p>
+                       </div>
+                    </div>
+                 ))}
+                 
+                 {leaderboard.length === 0 && (
+                    <p className="text-center text-[10px] text-slate-700 italic py-10">Searching for legends...</p>
+                 )}
+              </div>
+
+              <div className="mt-8 pt-6 border-t border-white/[0.05]">
+                 <div className="p-4 bg-indigo-500/5 rounded-2xl border border-indigo-500/10">
+                    <p className="text-[10px] text-indigo-400 font-black uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                       <Trophy size={10} /> Your Stats
+                    </p>
+                    <div className="flex justify-between items-end">
+                       <div>
+                          <p className="text-2xl font-black text-white">{user.engagementScore || 0}</p>
+                          <p className="text-[9px] text-slate-600 font-bold">Lifetime XP Score</p>
+                       </div>
+                       <div className="text-right">
+                          <p className="text-xs font-bold text-emerald-400">Top 5%</p>
+                          <p className="text-[9px] text-slate-600 font-bold">Percentile</p>
+                       </div>
+                    </div>
+                 </div>
+              </div>
+           </div>
+        </div>
       </div>
 
       <CreateQuizModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />

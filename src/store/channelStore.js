@@ -3,41 +3,42 @@ import { create } from 'zustand';
 
 const useChannelStore = create((set, get) => ({
   channels: [],
-  channelMap: {},       // channelName -> firestoreDocId
-  channelsData: {},     // channelName -> { type, description, isLocked }
-  activeChannel: null,
+  channelsData: {},     // channelId -> { name, type, description, isLocked }
+  activeChannelId: null,
   messages: [],
   isLoading: false,
   activeThreadId: null,
   threadMessages: [],
 
   setChannels: (fbChannels) => {
-    const names = fbChannels.map(ch => ch.name);
-    const map = {};
     const details = {};
     fbChannels.forEach(ch => {
-      map[ch.name] = ch.id;
-      details[ch.name] = {
-        type: ch.type || 'general',
+      details[ch.id] = {
+        name: ch.name,
+        type: ch.type || 'text',
         description: ch.description,
         isLocked: ch.isLocked,
         isAssignment: ch.isAssignment,
       };
     });
-    const current = get().activeChannel;
+    
+    const currentId = get().activeChannelId;
+    const firstId = fbChannels[0]?.id || null;
+    
     set({
-      channels: names, channelMap: map, channelsData: details,
-      activeChannel: names.includes(current) ? current : names[0] || null,
+      channels: fbChannels,
+      channelsData: details,
+      activeChannelId: fbChannels.find(c => c.id === currentId) ? currentId : firstId
     });
   },
 
-  setActiveChannel: (name) => set({ activeChannel: name, activeThreadId: null }),
+  selectChannel: (id) => set({ activeChannelId: id, activeThreadId: null }),
   setMessages: (messages) => set({ messages }),
   setLoading: (isLoading) => set({ isLoading }),
   setActiveThreadId: (id) => set({ activeThreadId: id }),
   setThreadMessages: (msgs) => set({ threadMessages: msgs }),
-  getActiveChannelId: () => get().channelMap[get().activeChannel] || null,
-  isCurrentChannelLocked: () => get().channelsData[get().activeChannel]?.isLocked || false,
+  getActiveChannelId: () => get().activeChannelId,
+  isCurrentChannelLocked: () => get().channelsData[get().activeChannelId]?.isLocked || false,
 }));
 
 export default useChannelStore;

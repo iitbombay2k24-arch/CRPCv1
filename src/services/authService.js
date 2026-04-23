@@ -16,16 +16,21 @@ import {
 import { auth, db } from '../lib/firebase';
 import { ROLE_LEVEL } from '../lib/rbac';
 
-// ---- LOGIN ----
 export async function loginUser(email, password) {
-  const cred = await signInWithEmailAndPassword(auth, email, password);
-  const userDoc = await getDoc(doc(db, 'users', cred.user.uid));
-  if (userDoc.exists()) {
-    await updateDoc(doc(db, 'users', cred.user.uid), {
-      status: 'online',
-      lastSeen: serverTimestamp()
-    });
-    return { uid: cred.user.uid, ...userDoc.data() };
+  try {
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    const userDoc = await getDoc(doc(db, 'users', cred.user.uid));
+    if (userDoc.exists()) {
+      await updateDoc(doc(db, 'users', cred.user.uid), {
+        status: 'online',
+        lastSeen: serverTimestamp()
+      });
+      return { uid: cred.user.uid, ...userDoc.data() };
+    }
+  } catch (error) {
+    // If it's a dev environment and password is 'testadmin', we can potentially bypass
+    // But Firebase Auth is strict. The real solution is completing the bulk update.
+    throw error;
   }
   return null;
 }

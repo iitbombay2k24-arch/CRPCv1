@@ -6,6 +6,9 @@ import Avatar from '../ui/Avatar';
 import { formatTimeAgo } from '../../lib/utils';
 import { getRoleBadge } from '../../lib/rbac';
 import Spinner from '../ui/Spinner';
+import { moderateMessage } from '../../services/moderationService';
+import useNotificationStore from '../../store/notificationStore';
+import { logModerationEvent } from '../../services/firestoreService';
 
 export default function ThreadPanel({ channelId, parentMsg, onClose }) {
   const { user } = useAuthStore();
@@ -32,11 +35,28 @@ export default function ThreadPanel({ channelId, parentMsg, onClose }) {
     e.preventDefault();
     if (!newMessage.trim() || isSending) return;
 
+    // Moderation check
+    const { cleanText, isBlocked, reason } = moderateMessage(newMessage.trim());
+    
+    if (isBlocked) {
+      useNotificationStore.getState().warning(reason, 'Message Blocked');
+      logModerationEvent({
+        userId: user.uid,
+        userName: user.name,
+        userEmail: user.email,
+        text: newMessage.trim(),
+        reason,
+        location: `thread:${channelId}:${parentMsg.id}`,
+        type: 'block'
+      });
+      return;
+    }
+
     setIsSending(true);
     try {
       await sendMessage({
         channelId,
-        text: newMessage.trim(),
+        text: cleanText,
         senderId: user.uid,
         senderName: user.name,
         senderEmail: user.email,

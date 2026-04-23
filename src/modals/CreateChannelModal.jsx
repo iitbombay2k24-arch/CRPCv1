@@ -9,9 +9,11 @@ import {
   ChevronRight
 } from 'lucide-react';
 import Modal from '../components/ui/Modal';
-import { createChannel } from '../services/firestoreService';
+import { createChannel, logModerationEvent } from '../services/firestoreService';
 import useAuthStore from '../store/authStore';
 import Button from '../components/ui/Button';
+import { moderateMessage } from '../services/moderationService';
+import useNotificationStore from '../store/notificationStore';
 
 export default function CreateChannelModal({ isOpen, onClose }) {
   const { user } = useAuthStore();
@@ -24,15 +26,51 @@ export default function CreateChannelModal({ isOpen, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim() || isLoading) return;
+    
+    // RBAC: Extra layer of protection
+    if (user?.roleLevel < 3) {
+      alert('Only Admins can create channels.');
+      return;
+    }
+
+    // Clean channel name (no spaces, lowercase)
+    const rawName = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    
+    // Moderation check on name
+    const nameCheck = moderateMessage(rawName);
+    if (nameCheck.isBlocked) {
+      useNotificationStore.getState().warning(nameCheck.reason, 'Invalid Channel Name');
+      logModerationEvent({
+        userId: user.uid,
+        userName: user.name,
+        text: name,
+        reason: nameCheck.reason,
+        location: 'create_channel_name',
+        type: 'block'
+      });
+      return;
+    }
+
+    // Moderation check on description
+    const descCheck = moderateMessage(description.trim() || `Channel for ${rawName}`);
+    if (descCheck.isBlocked) {
+      useNotificationStore.getState().warning(descCheck.reason, 'Invalid Description');
+      logModerationEvent({
+        userId: user.uid,
+        userName: user.name,
+        text: description,
+        reason: descCheck.reason,
+        location: 'create_channel_desc',
+        type: 'block'
+      });
+      return;
+    }
 
     setIsLoading(true);
     try {
-      // Clean channel name (no spaces, lowercase)
-      const cleanName = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-      
       await createChannel({
-        name: cleanName,
-        description: description.trim() || `Channel for ${cleanName}`,
+        name: nameCheck.cleanText,
+        description: descCheck.cleanText,
         type: type,
         createdBy: user.uid,
         isLocked: isPrivate

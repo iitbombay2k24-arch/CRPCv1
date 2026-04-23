@@ -56,6 +56,35 @@ export function onDMMessages(dmId, callback) {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
 }
+export function onActiveDMs(userId, callback) {
+  const q = query(collection(db, 'dms'), where('participants', 'array-contains', userId));
+  return onSnapshot(q, async (snap) => {
+    const dmList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    callback(dmList);
+  });
+}
+
+export async function searchUsers(searchTerm) {
+  if (!searchTerm || searchTerm.length < 2) return [];
+  const q = query(
+    collection(db, 'users'),
+    where('name', '>=', searchTerm),
+    where('name', '<=', searchTerm + '\uf8ff'),
+    limit(5)
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+}
+export async function logModerationEvent(data) {
+  try {
+    await addDoc(collection(db, 'auditLogs'), {
+      ...data,
+      timestamp: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error logging moderation event:', error);
+  }
+}
 
 export async function sendMessage({ channelId, text, senderId, senderName, senderEmail, senderRole, type, parentId, files, participants }) {
   let collPath;

@@ -7,6 +7,8 @@ import useAuthStore from '../store/authStore';
 import { sendMessage, onDMMessages, toggleBookmark, markDMAsRead } from '../services/firestoreService';
 import Avatar from '../components/ui/Avatar';
 import Button from '../components/ui/Button';
+import { moderateMessage } from '../services/moderationService';
+import useNotificationStore from '../store/notificationStore';
 
 export default function DMPage({ recipient }) {
   const { user } = useAuthStore();
@@ -32,16 +34,35 @@ export default function DMPage({ recipient }) {
   const handleSend = async (e) => {
     e.preventDefault();
     if (!newMessage.trim() || isSending || !recipient) return;
+    
+    // Moderation check
+    const { cleanText, isBlocked, reason } = moderateMessage(newMessage.trim());
+    
+    if (isBlocked) {
+      useNotificationStore.getState().warning(reason, 'Message Blocked');
+      logModerationEvent({
+        userId: user.uid,
+        userName: user.name,
+        userEmail: user.email,
+        text: newMessage.trim(),
+        reason,
+        location: `dm:${recipient.uid}`,
+        type: 'block'
+      });
+      return;
+    }
+
     setIsSending(true);
     try {
       const combinedId = [user.uid, recipient.uid].sort().join('_');
       await sendMessage({
         channelId: combinedId,
-        text: newMessage.trim(),
+        text: cleanText,
         senderId: user.uid,
         senderName: user.name,
         senderRole: user.role,
         type: 'dm',
+        participants: [user.uid, recipient.uid] // Pass participants for security rules
       });
       setNewMessage('');
     } finally {
