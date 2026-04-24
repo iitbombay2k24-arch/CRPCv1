@@ -91,10 +91,6 @@ export default function App() {
     );
   }
 
-  // Real email verification check via Firebase Auth
-  // DEV BYPASS: set to true temporarily for UI audit — restore after
-  const isVerified = import.meta.env.DEV ? true : (firebaseUser?.emailVerified ?? false);
-
   // Not Authenticated -> Auth Flow
   if (!user) {
     return (
@@ -102,44 +98,6 @@ export default function App() {
         <AuthPage />
         <ToastContainer />
       </Suspense>
-    );
-  }
-
-  // Unverified -> Verification Barrier
-  if (!isVerified) {
-    return (
-      <div className="h-screen w-screen bg-slate-900 flex items-center justify-center p-6 text-center">
-        <div className="max-w-md space-y-8 animate-fade-in">
-           <div className="w-20 h-20 bg-indigo-500/10 rounded-3xl mx-auto flex items-center justify-center border border-indigo-500/30">
-              <Mail className="text-indigo-400" size={40} />
-           </div>
-           <div>
-              <h2 className="text-2xl font-bold text-white mb-2">Verify Your Identity</h2>
-              <p className="text-slate-400 text-sm leading-relaxed">
-                We've sent a verification link to <span className="text-indigo-400 font-bold">{firebaseUser?.email}</span>. 
-                Please click the link to activate your university workspace.
-              </p>
-           </div>
-           <div className="space-y-3">
-              <button 
-                onClick={() => window.location.reload()}
-                className="w-full h-12 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all shadow-lg"
-              >
-                I've Verified My Email
-              </button>
-              <button 
-                onClick={() => logoutUser()}
-                className="w-full h-12 bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold rounded-xl border border-slate-700 transition-all"
-              >
-                Sign Out
-              </button>
-           </div>
-           <p className="text-[10px] text-slate-600 uppercase tracking-widest">
-              Access is restricted to verified university credentials.
-           </p>
-        </div>
-        <ToastContainer />
-      </div>
     );
   }
 

@@ -7,8 +7,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
-  onAuthStateChanged,
-  sendEmailVerification
+  onAuthStateChanged
 } from 'firebase/auth';
 import {
   doc, setDoc, getDoc, collection, getDocs, updateDoc, serverTimestamp
@@ -39,8 +38,8 @@ export async function loginUser(email, password) {
 export async function registerUser({ email, password, name, prn, role, division, batch, branch }) {
   const cred = await createUserWithEmailAndPassword(auth, email, password);
 
-  // Send email verification (PRD: unverified users cannot access app)
-  await sendEmailVerification(cred.user);
+  // Registration bypasses email verification per user request
+  // await sendEmailVerification(cred.user);
 
   const assignedRole = role || 'Student';
   const userData = {
