@@ -50,7 +50,7 @@ function ShareExperienceModal({ isOpen, onClose, user, onSuccess }) {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="bg-[#0d0f1a] border border-white/[0.08] rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-fade-in">
+      <div className="bg-slate-900 border border-white/[0.08] rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-fade-in">
         <div className="p-6 border-b border-white/[0.06] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-center justify-center text-amber-400">

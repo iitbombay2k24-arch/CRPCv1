@@ -5,7 +5,8 @@
 
 import {
   collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc,
-  query, where, orderBy, limit, onSnapshot, increment, serverTimestamp
+  query, where, orderBy, limit, onSnapshot, increment, serverTimestamp,
+  arrayUnion, arrayRemove
 } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../lib/firebase';
@@ -14,10 +15,24 @@ import { ROLE_LEVEL } from '../lib/rbac';
 
 // ===================== CHAT SERVICES =====================
 
-export function onChannelsChange(callback) {
+export function onChannelsChange(user, callback) {
+  // Real-time listener for channels
+  // SuperAdmin sees all. Others see Global + their School.
   const q = query(collection(db, 'channels'), orderBy('name', 'asc'));
+  
   return onSnapshot(q, (snap) => {
-    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const allChannels = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    
+    // Filter based on user profile
+    const filtered = allChannels.filter(ch => {
+      if (user?.role === 'SuperAdmin' || user?.roleLevel >= 4) return true;
+      if (ch.visibility === 'Global') return true;
+      
+      // Default to School filtering
+      return ch.school === (user?.school || 'School of Engineering');
+    });
+
+    callback(filtered);
   });
 }
 
@@ -74,6 +89,40 @@ export async function searchUsers(searchTerm) {
   );
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+}
+
+// ===================== FRIENDS SYSTEM =====================
+
+export async function addFriend(userId, friendId) {
+  const userRef = doc(db, 'users', userId);
+  await updateDoc(userRef, {
+    friends: arrayUnion(friendId)
+  });
+}
+
+export async function removeFriend(userId, friendId) {
+  const userRef = doc(db, 'users', userId);
+  await updateDoc(userRef, {
+    friends: arrayRemove(friendId)
+  });
+}
+
+export function onFriendsChange(userId, callback) {
+  const userRef = doc(db, 'users', userId);
+  return onSnapshot(userRef, async (snap) => {
+    if (!snap.exists()) return callback([]);
+    const friendIds = snap.data().friends || [];
+    if (friendIds.length === 0) return callback([]);
+    
+    // Fetch friend data
+    const friendsData = await Promise.all(
+      friendIds.map(async (fid) => {
+        const fDoc = await getDoc(doc(db, 'users', fid));
+        return fDoc.exists() ? { uid: fDoc.id, ...fDoc.data() } : null;
+      })
+    );
+    callback(friendsData.filter(Boolean));
+  });
 }
 export async function logModerationEvent(data) {
   try {

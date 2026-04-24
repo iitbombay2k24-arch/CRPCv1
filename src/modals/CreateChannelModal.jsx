@@ -21,14 +21,17 @@ export default function CreateChannelModal({ isOpen, onClose }) {
   const [description, setDescription] = useState('');
   const [type, setType] = useState('text'); // text, voice, resource, assignment
   const [isPrivate, setIsPrivate] = useState(false);
+  const [visibility, setVisibility] = useState('School'); // School, Global (SuperAdmin only)
   const [isLoading, setIsLoading] = useState(false);
+
+  const isSuperAdmin = user?.role === 'SuperAdmin' || user?.roleLevel >= 4;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim() || isLoading) return;
     
     // RBAC: Extra layer of protection
-    if (user?.roleLevel < 3) {
+    if (user?.roleLevel < 3 && user?.role !== 'Admin' && user?.role !== 'SuperAdmin') {
       alert('Only Admins can create channels.');
       return;
     }
@@ -73,7 +76,9 @@ export default function CreateChannelModal({ isOpen, onClose }) {
         description: descCheck.cleanText,
         type: type,
         createdBy: user.uid,
-        isLocked: isPrivate
+        isLocked: isPrivate,
+        visibility: isSuperAdmin ? visibility : 'School',
+        school: user?.school || 'School of Engineering'
       });
 
       // Reset and Close
@@ -81,6 +86,7 @@ export default function CreateChannelModal({ isOpen, onClose }) {
       setDescription('');
       setType('text');
       setIsPrivate(false);
+      setVisibility('School');
       onClose();
     } catch (error) {
       console.error('Error creating channel:', error);
@@ -105,6 +111,34 @@ export default function CreateChannelModal({ isOpen, onClose }) {
           </header>
 
           <div className="space-y-4">
+            {/* Visibility Selector (SuperAdmin Only) */}
+            {isSuperAdmin && (
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                  Channel Scope
+                </label>
+                <div className="flex gap-2 p-1 bg-slate-900 rounded-xl border border-white/5">
+                  {['School', 'Global'].map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setVisibility(v)}
+                      className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all
+                        ${visibility === v 
+                          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' 
+                          : 'text-slate-500 hover:text-slate-300'}`}
+                    >
+                      {v} Visibility
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[9px] text-slate-600 mt-1.5 px-1 italic">
+                  {visibility === 'Global' 
+                    ? 'Anyone in the University can see this channel.' 
+                    : `Only students in ${user?.school || 'your school'} can see this.`}
+                </p>
+              </div>
+            )}
             {/* Channel Name */}
             <div>
               <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">

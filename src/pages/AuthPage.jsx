@@ -49,7 +49,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#03040b] flex items-center justify-center relative overflow-hidden p-4">
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center relative overflow-hidden p-4">
       {/* Mesh Background */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 left-0 w-[60vw] h-[60vw] max-w-[700px] max-h-[700px] bg-indigo-600/10 rounded-full blur-[120px] -translate-x-1/3 -translate-y-1/3" />

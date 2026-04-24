@@ -3,16 +3,43 @@
 
 @theme {
   --font-sans: 'Outfit', ui-sans-serif, system-ui, sans-serif;
-  --color-primary: #6366f1;
+  --color-primary: #d4a373;
+  
+  /* Overriding default colors to earthy/organic tones */
+  --color-indigo-400: #e2b788;
+  --color-indigo-500: #d4a373; /* Mustard/Tan */
+  --color-indigo-600: #c19163;
+  --color-indigo-900: #4a3623;
+  
+  --color-violet-400: #d8e0bc;
+  --color-violet-500: #ccd5ae; /* Sage Green */
+  --color-violet-600: #b8c199;
+  
+  --color-sky-400: #e9edc9;
+  --color-sky-500: #dce1b4;
+  
+  --color-emerald-400: #8a9a86; /* Darker sage/olive */
+  --color-emerald-500: #768572;
+  
+  --color-amber-400: #faedcb; /* Cream */
+  --color-amber-500: #e8dcb9;
+  
+  --color-rose-400: #c88a83; /* Muted terracota */
+  --color-rose-500: #b57a73;
+  
+  --color-slate-950: #121110;
+  --color-slate-900: #1e1c1b;
+  --color-slate-800: #2a2826;
+  --color-slate-700: #3b3835;
 }
 
 /* ============================================
-   DYPIU Collab — Global Premium Styles
+   DYPIU Collab — Global Premium Styles (Organic Earth Theme)
    ============================================ */
 
 :root {
-  --color-brand-start: #4318FF;
-  --color-brand-end: #868CFF;
+  --color-brand-start: #d4a373; /* Warm mustard/tan */
+  --color-brand-end: #ccd5ae;   /* Sage green */
 }
 
 html, body, #root {
@@ -24,8 +51,8 @@ html, body, #root {
 body {
   margin: 0;
   font-family: var(--font-sans);
-  background-color: #03040b; /* Extremely dark deep blue/black */
-  color: #FFFFFF;
+  background-color: #1e1c1b; /* Earthy dark charcoal */
+  color: #fefae0; /* Creamy off-white text */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -51,26 +78,26 @@ body {
   border-radius: 50%;
   filter: blur(100px);
   animation: meshMovement 15s ease-in-out infinite alternate;
-  opacity: 0.5;
+  opacity: 0.4;
 }
 
 .mesh-orb-1 {
   top: -10%; left: -5%;
   width: 50vw; height: 50vw;
-  background: rgba(99, 102, 241, 0.15); /* Indigo */
+  background: rgba(212, 163, 115, 0.15); /* Mustard/Tan */
 }
 
 .mesh-orb-2 {
   bottom: -20%; right: -10%;
   width: 60vw; height: 60vw;
-  background: rgba(168, 85, 247, 0.1); /* Purple */
+  background: rgba(204, 213, 174, 0.12); /* Sage green */
   animation-delay: -5s;
 }
 
 .mesh-orb-3 {
   top: 30%; left: 60%;
   width: 40vw; height: 40vw;
-  background: rgba(14, 165, 233, 0.1); /* Sky */
+  background: rgba(140, 122, 107, 0.15); /* Warm taupe */
   animation-delay: -10s;
   transform: translate(-50%, -50%);
 }
@@ -79,8 +106,8 @@ body {
   position: absolute;
   inset: 0;
   background-image: 
-    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+    linear-gradient(rgba(254, 250, 224, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(254, 250, 224, 0.02) 1px, transparent 1px);
   background-size: 40px 40px;
   mask-image: radial-gradient(ellipse at center, black 40%, transparent 100%);
   -webkit-mask-image: radial-gradient(ellipse at center, black 40%, transparent 100%);
@@ -88,37 +115,37 @@ body {
 
 /* --- Premium Utilities & Glassmorphism --- */
 .glass-panel {
-  background: rgba(15, 20, 35, 0.4);
+  background: rgba(35, 33, 31, 0.4);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(254, 250, 224, 0.04);
 }
 
 .glass-card {
-  background: linear-gradient(145deg, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.4) 100%);
+  background: linear-gradient(145deg, rgba(46, 43, 40, 0.5) 0%, rgba(30, 28, 26, 0.5) 100%);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(254, 250, 224, 0.05);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass-card:hover {
-  background: linear-gradient(145deg, rgba(40, 51, 69, 0.45) 0%, rgba(20, 28, 48, 0.45) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 12px 40px rgba(99, 102, 241, 0.15);
+  background: linear-gradient(145deg, rgba(55, 52, 48, 0.55) 0%, rgba(38, 35, 33, 0.55) 100%);
+  border: 1px solid rgba(254, 250, 224, 0.1);
+  box-shadow: 0 12px 40px rgba(212, 163, 115, 0.1); /* Mustard shadow */
   transform: translateY(-2px);
 }
 
 .premium-gradient-text {
-  background: linear-gradient(to right, #818cf8, #c084fc, #f472b6);
+  background: linear-gradient(to right, #d4a373, #e9edc9, #ccd5ae);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .premium-gradient-bg {
-  background: linear-gradient(to right, #6366f1, #a855f7, #ec4899);
+  background: linear-gradient(to right, #d4a373, #e9edc9, #ccd5ae);
 }
 
 /* --- Scrollbar --- */

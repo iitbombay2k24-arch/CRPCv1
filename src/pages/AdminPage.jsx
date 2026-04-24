@@ -150,15 +150,78 @@ export default function AdminPage() {
                 </div>
                 <h3 className="text-sm font-bold text-white tracking-tight">Security Audit History</h3>
               </div>
-              <div className="relative">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                <input 
-                  type="text" 
-                  placeholder="Search logs..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-white/5 border border-white/10 rounded-xl px-9 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500/50 w-64"
-                />
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                  <input 
+                    type="text" 
+                    placeholder="Search logs..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="bg-white/5 border border-white/10 rounded-xl px-9 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500/50 w-64"
+                  />
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    info('Generating Report', 'Compiling audit logs into PDF...');
+                    setTimeout(() => success('Report Ready', 'Audit_Report_v8.pdf downloaded.'), 1500);
+                  }}
+                >
+                  Export Report
+                </Button>
+              </div>
+            </div>
+
+            {/* Data-Centric Graphs Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6 border-b border-white/[0.05] bg-black/10">
+              <div className="col-span-2 relative">
+                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Traffic & Anomaly Detection</h4>
+                <div className="h-32 w-full relative flex items-end justify-between">
+                  {/* SVG Line/Area Chart */}
+                  <svg viewBox="0 0 400 100" className="absolute inset-0 w-full h-full preserve-3d" preserveAspectRatio="none">
+                    <defs>
+                      <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#ccd5ae" stopOpacity="0.3" />
+                        <stop offset="100%" stopColor="#ccd5ae" stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                    <path 
+                      d="M0,100 L0,60 Q20,30 50,50 T100,70 T150,40 T200,80 T250,30 T300,50 T350,20 T400,60 L400,100 Z" 
+                      fill="url(#chartGrad)" 
+                    />
+                    <path 
+                      d="M0,60 Q20,30 50,50 T100,70 T150,40 T200,80 T250,30 T300,50 T350,20 T400,60" 
+                      fill="none" 
+                      stroke="#ccd5ae" 
+                      strokeWidth="3" 
+                      className="drop-shadow-[0_0_8px_rgba(204,213,174,0.8)]"
+                    />
+                  </svg>
+                  {/* X-Axis labels */}
+                  <div className="absolute -bottom-5 w-full flex justify-between text-[8px] font-bold text-slate-600">
+                    <span>00:00</span><span>04:00</span><span>08:00</span><span>12:00</span><span>16:00</span><span>20:00</span><span>Now</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="border-l border-white/[0.05] pl-6 flex flex-col justify-center">
+                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Event Distribution</h4>
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex justify-between text-[9px] font-bold mb-1"><span className="text-indigo-400">Access Granted</span><span className="text-white">65%</span></div>
+                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden"><div className="h-full bg-indigo-400 w-[65%]" /></div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-[9px] font-bold mb-1"><span className="text-emerald-400">Content Moderation</span><span className="text-white">25%</span></div>
+                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden"><div className="h-full bg-emerald-400 w-[25%]" /></div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-[9px] font-bold mb-1"><span className="text-rose-400">Security Flags</span><span className="text-white">10%</span></div>
+                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden"><div className="h-full bg-rose-400 w-[10%]" /></div>
+                  </div>
+                </div>
               </div>
             </div>
             
@@ -234,7 +297,7 @@ export default function AdminPage() {
                           className="w-full text-[10px] font-bold bg-white/[0.06] border border-white/[0.10] text-slate-300 rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-indigo-500/40 cursor-pointer appearance-none pr-6 uppercase tracking-wider"
                         >
                           {Object.values(ROLES).map(r => (
-                            <option key={r} value={r} className="bg-[#0d0f1a]">{r}</option>
+                            <option key={r} value={r} className="bg-slate-900">{r}</option>
                           ))}
                         </select>
                         <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />

@@ -252,8 +252,8 @@ export default function FocusPage() {
                   />
                   <defs>
                      <linearGradient id="timerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#6366f1" />
-                        <stop offset="100%" stopColor="#a855f7" />
+                        <stop offset="0%" stopColor="#d4a373" />
+                        <stop offset="100%" stopColor="#ccd5ae" />
                      </linearGradient>
                   </defs>
                   </svg>

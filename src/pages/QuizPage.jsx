@@ -60,7 +60,7 @@ export default function QuizPage() {
         particleCount: 150,
         spread: 70,
         origin: { y: 0.6 },
-        colors: ['#6366f1', '#a855f7', '#ec4899', '#f59e0b']
+        colors: ['#d4a373', '#ccd5ae', '#8a9a86', '#e2b788']
       });
     }
   }, [result]);

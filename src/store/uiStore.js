@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 
 const useUIStore = create((set) => ({
-  activeTab: 'chat',
+  activeTab: 'dashboard',
   isDarkMode: true,
   isSidebarOpen: typeof window !== 'undefined' ? window.innerWidth >= 1024 : true,
   dndEnabled: false,

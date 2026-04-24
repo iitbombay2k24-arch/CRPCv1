@@ -7,6 +7,7 @@ import { onChannelsChange, updateUserStatus, updateUserStreak } from './services
 import { Mail, MessageSquarePlus } from 'lucide-react';
 // Lazy load pages for performance optimization
 const AuthPage = lazy(() => import('./pages/AuthPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const ChatPage = lazy(() => import('./pages/ChatPage'));
 const AnnouncementPage = lazy(() => import('./pages/AnnouncementPage'));
 const ResourcePage = lazy(() => import('./pages/ResourcePage'));
@@ -20,6 +21,7 @@ const DMPage = lazy(() => import('./pages/DMPage'));
 const BookmarksPage = lazy(() => import('./pages/BookmarksPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const QuizPage = lazy(() => import('./pages/QuizPage'));
+const AssessmentsPage = lazy(() => import('./pages/AssessmentsPage'));
 const PlacementPage = lazy(() => import('./pages/PlacementPage'));
 const LeaderboardPage = lazy(() => import('./pages/LeaderboardPage'));
 const FocusPage = lazy(() => import('./pages/FocusPage'));
@@ -74,7 +76,7 @@ export default function App() {
   // 2. Listen for Channel Changes (Real-time)
   useEffect(() => {
     if (!user) return;
-    const unsubscribe = onChannelsChange((channels) => {
+    const unsubscribe = onChannelsChange(user, (channels) => {
       setChannels(channels);
     });
     return () => unsubscribe();
@@ -106,7 +108,7 @@ export default function App() {
   // Unverified -> Verification Barrier
   if (!isVerified) {
     return (
-      <div className="h-screen w-screen bg-[#0A0A0B] flex items-center justify-center p-6 text-center">
+      <div className="h-screen w-screen bg-slate-900 flex items-center justify-center p-6 text-center">
         <div className="max-w-md space-y-8 animate-fade-in">
            <div className="w-20 h-20 bg-indigo-500/10 rounded-3xl mx-auto flex items-center justify-center border border-indigo-500/30">
               <Mail className="text-indigo-400" size={40} />
@@ -143,7 +145,7 @@ export default function App() {
 
   // Authenticated -> Main Layout
   return (
-    <div className="h-screen w-screen bg-[#03040b] flex overflow-hidden relative text-slate-200">
+    <div className="h-screen w-screen bg-slate-900 flex overflow-hidden relative text-slate-200">
       {/* Premium Mesh Background */}
       <div className="mesh-bg">
          <div className="mesh-orb mesh-orb-1" />
@@ -168,7 +170,9 @@ export default function App() {
                <Spinner />
              </div>
            }>
-             {activeTab === 'chat' ? (
+             {activeTab === 'dashboard' ? (
+               <DashboardPage />
+             ) : activeTab === 'chat' ? (
                <ChatPage />
              ) : activeTab === 'announcements' ? (
                <AnnouncementPage />
@@ -193,6 +197,8 @@ export default function App() {
              ) : activeTab === 'profile' ? (
                <ProfilePage />
              ) : activeTab === 'quizzes' ? (
+               <AssessmentsPage />
+             ) : activeTab === 'live-quizzes' ? (
                <QuizPage />
              ) : activeTab === 'placement' ? (
                <PlacementPage />
@@ -231,7 +237,7 @@ export default function App() {
       {/* Floating Feedback Button */}
       <button 
         onClick={() => window.alert('Opening DYPIU Feedback Portal...')}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 text-white rounded-2xl shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-[60] group border-4 border-[#03040b]"
+        className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 text-white rounded-2xl shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-[60] group border-4 border-slate-900"
       >
         <MessageSquarePlus size={24} />
         <div className="absolute right-full mr-4 px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-[10px] font-black uppercase text-white tracking-widest opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">

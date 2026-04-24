@@ -135,13 +135,13 @@ export default function ProfilePage() {
       {/* Avatar overlapping banner */}
       <div className="px-10 relative">
         <div className="-mt-16 mb-4 relative inline-block">
-          <div className="p-1.5 bg-[#03040b] rounded-3xl shadow-2xl">
+          <div className="p-1.5 bg-slate-900 rounded-3xl shadow-2xl">
             <Avatar name={user?.name} src={user?.avatarUrl} size="xl" className="w-28 h-28 rounded-2xl" />
           </div>
           <input type="file" id="avatar-input" className="hidden" accept="image/*" onChange={handleAvatarChange} />
           <label 
             htmlFor="avatar-input"
-            className="absolute bottom-2 right-2 w-8 h-8 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-xl hover:scale-110 cursor-pointer transition-transform border-2 border-[#03040b]"
+            className="absolute bottom-2 right-2 w-8 h-8 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-xl hover:scale-110 cursor-pointer transition-transform border-2 border-slate-900"
           >
             {isUploading ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Camera size={14} />}
           </label>
@@ -168,7 +168,7 @@ export default function ProfilePage() {
                       : 'bg-white/[0.02] border-white/[0.05] text-slate-500 hover:text-slate-300'
                     }`}
                 >
-                  <div className={`w-1.5 h-1.5 rounded-full ${s === 'online' ? 'bg-emerald-500 shadow-[0_0_6px_#10b981]' : s === 'away' ? 'bg-amber-500 shadow-[0_0_6px_#f59e0b]' : 'bg-rose-500 shadow-[0_0_6px_#ef4444]'}`} />
+                  <div className={`w-1.5 h-1.5 rounded-full ${s === 'online' ? 'bg-emerald-500 shadow-[0_0_6px_#8a9a86]' : s === 'away' ? 'bg-amber-500 shadow-[0_0_6px_#e8dcb9]' : 'bg-rose-500 shadow-[0_0_6px_#c88a83]'}`} />
                   {s}
                 </button>
               ))}

@@ -75,6 +75,59 @@ export default function QAPage() {
       <div className="flex-1 flex overflow-hidden">
         {/* Left: Question List */}
         <div className={`flex-1 overflow-y-auto custom-scrollbar p-5 space-y-3 ${selected ? 'hidden lg:block lg:max-w-[480px] lg:border-r lg:border-white/[0.05]' : 'block'}`}>
+          {/* Topic Categories from Image */}
+          {!selected && (
+            <div className="flex flex-col gap-5 mb-8">
+              {[
+                { title: 'Quantitative Ability', weeks: '14', questions: '300+', level: 'Pro', icon: 'Calculator' },
+                { title: 'Verbal Ability', weeks: '14', questions: '300+', level: 'Pro', icon: 'Type' },
+                { title: 'Logical Reasoning', weeks: '14', questions: '300+', level: 'Pro', icon: 'Lightbulb' }
+              ].map((topic, i) => (
+                <div key={i} className="glass-card rounded-2xl p-5 flex flex-col md:flex-row items-center gap-5 relative overflow-hidden group">
+                  {/* Left Icon */}
+                  <div className="flex items-center gap-5 shrink-0">
+                    <div className="w-14 h-14 bg-gradient-to-br from-indigo-500/20 to-violet-500/10 rounded-2xl border border-indigo-500/20 flex items-center justify-center text-indigo-400 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(99,102,241,0.2)]">
+                      {topic.icon === 'Calculator' && <span className="font-bold text-2xl">∑</span>}
+                      {topic.icon === 'Type' && <span className="font-bold text-2xl">A</span>}
+                      {topic.icon === 'Lightbulb' && <HelpCircle size={28} />}
+                    </div>
+                    <div className="hidden md:block w-px h-14 bg-white/[0.08]" />
+                  </div>
+
+                  {/* Content Area */}
+                  <div className="flex-1 min-w-0 flex flex-col justify-center text-left">
+                    <h3 className="text-lg font-black text-white tracking-tight mb-1">{topic.title}</h3>
+                    <p className="text-[10px] text-slate-400 font-medium mb-3">
+                      {topic.weeks} Weeks | Average one assignment / week.....
+                    </p>
+                    
+                    <div className="flex items-center gap-6 md:gap-12">
+                      <div>
+                        <p className="text-[9px] font-bold text-amber-400 uppercase tracking-widest mb-0.5">Topic</p>
+                        <p className="text-xs font-semibold text-slate-300">{topic.weeks}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-bold text-amber-400 uppercase tracking-widest mb-0.5">Question</p>
+                        <p className="text-xs font-semibold text-slate-300">{topic.questions}</p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-bold text-amber-400 uppercase tracking-widest mb-0.5">Level</p>
+                        <p className="text-xs font-semibold text-slate-300">{topic.level}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Action Button */}
+                  <div className="shrink-0 w-full md:w-auto mt-4 md:mt-0">
+                    <Button variant="primary" className="w-full md:w-28 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 text-xs rounded-xl">
+                      Let's Go
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-4 px-1">
             <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest">
               {questions.length} Questions

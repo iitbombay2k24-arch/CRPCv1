@@ -144,7 +144,7 @@ export default function TopBar() {
                 absolute top-1.5 right-1.5 w-2 h-2 
                 bg-indigo-500 rounded-full 
                 shadow-[0_0_6px_rgba(99,102,241,0.8)]
-                border-2 border-[#03040b]
+                border-2 border-slate-900
               " />
             )}
           </button>

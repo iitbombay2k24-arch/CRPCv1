@@ -66,7 +66,7 @@ export default function PlacementPage() {
         particleCount: 150,
         spread: 70,
         origin: { y: 0.6 },
-        colors: ['#6366f1', '#a855f7', '#ec4899']
+        colors: ['#d4a373', '#ccd5ae', '#8a9a86']
       });
 
       success(`Applied successfully for ${drive.company}!`, 'Good luck with your application.');
