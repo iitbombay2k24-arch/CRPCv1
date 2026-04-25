@@ -107,8 +107,10 @@ export default function App() {
   }
 
 
-  // SuperAdmin Command Center Override
-  if (user.roleLevel >= 4 && activeTab === 'admin') {
+  // SuperAdmin Command Center Override — check BOTH roleLevel AND role string
+  const isSuperAdmin = user.roleLevel >= 4 || user.role === 'SuperAdmin';
+
+  if (isSuperAdmin && activeTab === 'admin') {
     return (
       <Suspense fallback={<div className="h-screen w-screen bg-slate-950 flex items-center justify-center"><Spinner /></div>}>
         <SuperAdminLayout />

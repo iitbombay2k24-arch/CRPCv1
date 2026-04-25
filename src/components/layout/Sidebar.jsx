@@ -96,8 +96,8 @@ export default function Sidebar() {
   const [friends, setFriends] = useState([]);
   const [showFriends, setShowFriends] = useState(true);
 
-  const isAdmin = user?.roleLevel >= 3;
-  const isSuperAdmin = user?.roleLevel >= 4;
+  const isAdmin = user?.roleLevel >= 3 || user?.role === 'Admin' || user?.role === 'SuperAdmin';
+  const isSuperAdmin = user?.roleLevel >= 4 || user?.role === 'SuperAdmin';
 
   // Listen for Friends
   useEffect(() => {
