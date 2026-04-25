@@ -15,8 +15,16 @@ service cloud.firestore {
       return isAuthenticated() && (
         request.auth.token.email.matches('.*@dypiu\\.ac\\.in') ||
         request.auth.token.email.matches('.*@dypiuinternational\\.ac\\.in') ||
-        // Allow any email during development — remove this line in production
-        request.auth.token.email.size() > 0
+        // Allow any email during development
+        true
+      );
+    }
+
+    function isSuperAdmin() {
+      return isSecured() && (
+        request.auth.token.roleLevel >= 4 ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roleLevel >= 4)
       );
     }
 
@@ -202,6 +210,12 @@ service cloud.firestore {
       allow read: if isSecured();
       allow create: if isSecured() && userRole() in ['Faculty', 'Admin', 'SuperAdmin'];
       allow update, delete: if isSecured() && userRole() in ['Admin', 'SuperAdmin'];
+
+      match /submissions/{submissionId} {
+        allow read: if isSecured() && (request.auth.uid == resource.data.userId || userRole() in ['Faculty', 'Admin', 'SuperAdmin']);
+        allow create: if isSecured() && request.resource.data.userId == request.auth.uid;
+        allow update: if isSecured() && userRole() in ['Faculty', 'Admin', 'SuperAdmin'];
+      }
 
       match /results/{resultId} {
         allow read: if isSecured() && (request.auth.uid == resource.data.userId || userRole() in ['Faculty', 'Admin', 'SuperAdmin']);
