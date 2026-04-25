@@ -96,10 +96,6 @@ export default function App() {
     );
   }
 
-  // Real email verification check via Firebase Auth
-  // DEV BYPASS: set to true temporarily for UI audit — restore after
-  const isVerified = import.meta.env.DEV ? true : (firebaseUser?.emailVerified ?? false);
-
   // Not Authenticated -> Auth Flow
   if (!user) {
     return (
@@ -110,6 +106,7 @@ export default function App() {
     );
   }
 
+<<<<<<< HEAD
   // Unverified -> Verification Barrier
   if (!isVerified) {
     return (
@@ -158,6 +155,8 @@ export default function App() {
     );
   }
 
+=======
+>>>>>>> 2090374977ebe3f64efa2903b53955ba6b940a94
   // Authenticated -> Main Layout
   return (
     <div className="h-screen w-screen bg-slate-900 flex overflow-hidden relative text-slate-200">
