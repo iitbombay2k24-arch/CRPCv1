@@ -6,7 +6,7 @@
 import {
   collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc,
   query, where, orderBy, limit, onSnapshot, increment, serverTimestamp,
-  arrayUnion, arrayRemove
+  arrayUnion, arrayRemove, collectionGroup, writeBatch, startAfter
 } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../lib/firebase';
@@ -135,6 +135,17 @@ export async function logModerationEvent(data) {
   }
 }
 
+export function onFlaggedMessagesChange(callback) {
+  const q = query(collectionGroup(db, 'messages'), where('dlpFlagged', '==', true), orderBy('createdAt', 'desc'));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => ({ 
+      id: d.id, 
+      ...d.data(),
+      containerId: d.ref.parent.parent?.id // Get channel/dm ID
+    })));
+  });
+}
+
 export async function sendMessage({ channelId, text, senderId, senderName, senderEmail, senderRole, type, parentId, files, participants }) {
   let collPath;
   if (type === 'dm') {
@@ -182,6 +193,11 @@ export async function sendMessage({ channelId, text, senderId, senderName, sende
 export async function deleteMessage(containerId, messageId, isDM = false) {
   const coll = isDM ? 'dms' : 'channels';
   await deleteDoc(doc(db, coll, containerId, 'messages', messageId));
+}
+
+export async function approveMessage(containerId, messageId, isDM = false) {
+  const coll = isDM ? 'dms' : 'channels';
+  await updateDoc(doc(db, coll, containerId, 'messages', messageId), { dlpFlagged: false });
 }
 
 export async function togglePinMessage(containerId, messageId, isDM = false) {
@@ -282,6 +298,10 @@ export function onResourcesChange(callback) {
   });
 }
 
+export async function deleteResource(id) {
+  await deleteDoc(doc(db, 'resources', id));
+}
+
 // ===================== Q&A BOARD =====================
 
 export async function createQuestion({ title, body, tags, authorId, authorName }) {
@@ -290,6 +310,10 @@ export async function createQuestion({ title, body, tags, authorId, authorName }
     authorId, authorName, upvotes: [], isResolved: false,
     answerCount: 0, createdAt: serverTimestamp()
   });
+}
+
+export async function deleteQuestion(id) {
+  await deleteDoc(doc(db, 'questions', id));
 }
 
 // ===================== KANBAN BOARD =====================
@@ -343,9 +367,44 @@ export async function toggleBookmark(userId, message) {
 
 // ===================== TIMETABLE =====================
 
+// ===================== SCHEDULER & ATTENDANCE =====================
+
+export function onSchedulerSessionsChange(dateRange, callback) {
+  // Simulating date filtering - in production use where() with timestamps
+  const q = query(collection(db, 'schedulerSessions'), orderBy('date', 'desc'));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+}
+
+export async function markAttendance(sessionId, { presentCount, totalStudents, attendanceList }) {
+  const sessionRef = doc(db, 'schedulerSessions', sessionId);
+  await updateDoc(sessionRef, {
+    status: 'Session Conducted',
+    attendanceStatus: 'Done',
+    presentCount,
+    totalStudents,
+    markedAt: serverTimestamp(),
+    percentage: ((presentCount / totalStudents) * 100).toFixed(2)
+  });
+  
+  // Optionally save detailed list in sub-collection
+  const batch = writeBatch(db);
+  attendanceList.forEach(item => {
+    const logRef = doc(collection(sessionRef, 'attendanceLog'), item.studentId);
+    batch.set(logRef, { ...item, markedAt: serverTimestamp() });
+  });
+  await batch.commit();
+}
+
 export function onTimetableChange(division, callback) {
   if (!division) return () => {};
-  const q = query(collection(db, 'timetable'), where('division', '==', division), orderBy('timeStart', 'asc'));
+  let q;
+  if (division === 'All') {
+    q = query(collection(db, 'timetable'), orderBy('timeStart', 'asc'));
+  } else {
+    q = query(collection(db, 'timetable'), where('division', '==', division), orderBy('timeStart', 'asc'));
+  }
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
@@ -374,12 +433,24 @@ export function onQuizzesChange(callback) {
   const q = query(collection(db, 'quizzes'), orderBy('createdAt', 'desc'));
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  }, (err) => {
+    console.error("Quizzes listener error:", err);
+    callback([]); // Return empty list on permission error to prevent app crash
   });
 }
 
-export async function submitQuizResult({ quizId, studentId, studentName, score, total }) {
-  return await addDoc(collection(db, 'quizzes', quizId, 'results'), {
-    studentId, studentName, score, total, submittedAt: serverTimestamp()
+export async function deleteQuiz(id) {
+  await deleteDoc(doc(db, 'quizzes', id));
+}
+
+export async function toggleQuizStatus(id, active) {
+  await updateDoc(doc(db, 'quizzes', id), { active });
+}
+
+export async function submitQuizResult(data) {
+  const { quizId, userId, userName, answers, timeTaken, isFlagged, violationsCount } = data;
+  const docRef = await addDoc(collection(db, 'quizzes', quizId, 'submissions'), {
+    userId, userName, answers, timeTaken, isFlagged, violationsCount, submittedAt: serverTimestamp()
   });
   return docRef.id;
 }
@@ -569,21 +640,47 @@ export function onTypingStatusChange(containerId, callback) {
 
 // ===================== PLACEMENT APPLICATIONS =====================
 
-export async function applyToDrive(driveId, userData) {
-  const appRef = doc(db, 'placementDrives', driveId, 'applications', userData.uid);
-  const snap = await getDoc(appRef);
-  if (snap.exists()) throw new Error('You have already applied for this drive.');
-  
-  await setDoc(appRef, {
-    ...userData,
-    appliedAt: serverTimestamp(),
-    status: 'Applied'
+export function onDrivesChange(callback) {
+  const q = query(collection(db, 'placementDrives'), orderBy('createdAt', 'desc'));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
 }
 
+export async function deletePlacementDrive(id) {
+  await deleteDoc(doc(db, 'placementDrives', id));
+}
+
 export function onDriveApplications(driveId, callback) {
-  const q = query(collection(db, 'placementDrives', driveId, 'applications'));
-  return onSnapshot(q, (snap) => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+  const q = query(collection(db, 'placementDrives', driveId, 'applications'), orderBy('appliedAt', 'desc'));
+  return onSnapshot(q, (snap) => {
+    callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+  });
+}
+
+export async function updateApplicationStatus(driveId, studentId, status) {
+  await updateDoc(doc(db, 'placementDrives', driveId, 'applications', studentId), { status });
+}
+
+export async function applyToDrive(driveId, applicantData) {
+  const appRef = doc(db, 'placementDrives', driveId, 'applications', applicantData.uid);
+  const existing = await getDoc(appRef);
+  if (existing.exists()) throw new Error('You have already applied for this drive.');
+  await setDoc(appRef, {
+    ...applicantData,
+    status: 'Applied',
+    appliedAt: serverTimestamp()
+  });
+}
+
+// ===================== CHANNEL ADMIN =====================
+
+export async function deleteChannel(channelId) {
+  await deleteDoc(doc(db, 'channels', channelId));
+}
+
+export async function toggleChannelLock(channelId, locked) {
+  await updateDoc(doc(db, 'channels', channelId), { locked });
 }
 
 
@@ -599,7 +696,7 @@ export async function verifyAttendanceQR(studentId, studentName, qrString) {
   
   if (Date.now() > expire) throw new Error('QR Code has expired (valid for 5 mins)');
   
-  return await markAttendance({
+  return await markStudentAttendance({
     studentId,
     studentName,
     subject,
@@ -607,7 +704,7 @@ export async function verifyAttendanceQR(studentId, studentName, qrString) {
   });
 }
 
-export async function markAttendance({ studentId, studentName, subject, markedBy }) {
+export async function markStudentAttendance({ studentId, studentName, subject, markedBy }) {
   return await addDoc(collection(db, 'users', studentId, 'attendance'), {
     subject,
     studentName,
@@ -725,7 +822,7 @@ export async function seedInitialTasks() {
       createdAt: serverTimestamp()
     });
   }
-  return count;
+  return tasks.length;
 }
 
 // ===================== AUDIT LOGS =====================
@@ -738,7 +835,7 @@ export async function createAuditLog({ action, actorName, actorEmail, details })
 }
 
 export function onAuditLogChange(callback) {
-  const q = query(collection(db, 'auditLogs'), orderBy('timestamp', 'desc'), limit(100));
+  const q = query(collection(db, 'auditLogs'), orderBy('timestamp', 'desc'), limit(500));
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map(d => ({ 
       id: d.id, ...d.data(),

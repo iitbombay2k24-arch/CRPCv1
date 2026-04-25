@@ -28,12 +28,17 @@ const FocusPage = lazy(() => import('./pages/FocusPage'));
 const ResumeAnalyzerPage = lazy(() => import('./pages/ResumeAnalyzerPage'));
 const InterviewForumPage = lazy(() => import('./pages/InterviewForumPage'));
 const GroupStudyPage = lazy(() => import('./pages/GroupStudyPage'));
+const SecurityPage = lazy(() => import('./pages/SecurityPage'));
+const CalendarPage = lazy(() => import('./pages/CalendarPage'));
 
 import Sidebar from './components/layout/Sidebar';
 import TopBar from './components/layout/TopBar';
 import Spinner, { PageLoader } from './components/ui/Spinner';
 import ToastContainer from './components/ui/Toast';
 import GlobalSearchModal from './components/layout/GlobalSearchModal';
+import SuperAdminLayout from './components/layout/SuperAdminLayout';
+import FacultyAlertTray from './components/layout/FacultyAlertTray';
+import ErrorBoundary from './components/ui/ErrorBoundary';
 
 export default function App() {
   const { user, firebaseUser, isLoading, setUser, setFirebaseUser, setLoading } = useAuthStore();
@@ -143,6 +148,16 @@ export default function App() {
     );
   }
 
+  // SuperAdmin Command Center Override
+  if (user.roleLevel >= 4 && activeTab === 'admin') {
+    return (
+      <Suspense fallback={<div className="h-screen w-screen bg-slate-950 flex items-center justify-center"><Spinner /></div>}>
+        <SuperAdminLayout />
+        <ToastContainer />
+      </Suspense>
+    );
+  }
+
   // Authenticated -> Main Layout
   return (
     <div className="h-screen w-screen bg-slate-900 flex overflow-hidden relative text-slate-200">
@@ -170,7 +185,8 @@ export default function App() {
                <Spinner />
              </div>
            }>
-             {activeTab === 'dashboard' ? (
+             <ErrorBoundary>
+               {activeTab === 'dashboard' ? (
                <DashboardPage />
              ) : activeTab === 'chat' ? (
                <ChatPage />
@@ -212,6 +228,10 @@ export default function App() {
                <InterviewForumPage />
              ) : activeTab === 'group-study' ? (
                <GroupStudyPage />
+             ) : activeTab === 'security' ? (
+               <SecurityPage />
+             ) : activeTab === 'calendar' ? (
+               <CalendarPage />
              ) : (
                <div className="h-full w-full flex items-center justify-center text-slate-500 animate-fade-in p-8">
                   <div className="text-center">
@@ -228,7 +248,8 @@ export default function App() {
                   </div>
                </div>
              )}
-           </Suspense>
+             </ErrorBoundary>
+            </Suspense>
         </main>
       </div>
 
@@ -246,6 +267,7 @@ export default function App() {
       </button>
 
       <ToastContainer />
+      <FacultyAlertTray />
     </div>
   );
 }

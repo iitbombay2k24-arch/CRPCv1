@@ -23,7 +23,12 @@ export default function AnnouncementPage() {
 
   const canPost = hasPermission(user.role, 'POST_ANNOUNCEMENT');
 
-  const tagVariant = (tag) => tag === 'Crucial' ? 'danger' : tag === 'Event' ? 'info' : 'neutral';
+  const tagVariant = (tag) => {
+    if (tag === 'Examination' || tag === 'Urgent') return 'danger';
+    if (tag === 'Syllabus' || tag === 'Course') return 'info';
+    if (tag === 'Academic') return 'primary';
+    return 'neutral';
+  };
 
   return (
     <div className="h-full flex flex-col min-w-0">

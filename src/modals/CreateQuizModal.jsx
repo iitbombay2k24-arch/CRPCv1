@@ -14,6 +14,7 @@ import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
 import useAuthStore from '../store/authStore';
 import { createQuiz } from '../services/firestoreService';
+import Badge from '../components/ui/Badge';
 
 export default function CreateQuizModal({ isOpen, onClose }) {
   const { user } = useAuthStore();

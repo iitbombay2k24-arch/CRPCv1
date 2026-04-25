@@ -3,7 +3,7 @@ import {
   MessageSquare, Hash, Users, Bell, BookOpen, CheckSquare,
   HelpCircle, Settings, Plus, Search, Calendar, ClipboardCheck,
   ShieldAlert, Shield, Bookmark, Trophy, Briefcase, Medal, Timer,
-  ChevronDown, LogOut, Sparkles, Zap, Home
+  ChevronDown, LogOut, Sparkles, Zap, Home, User
 } from 'lucide-react';
 
 import { onUsersChange, onActiveDMs, searchUsers, onFriendsChange, addFriend, removeFriend } from '../../services/firestoreService';
@@ -46,6 +46,7 @@ const NAV_SECTIONS = {
       { id: 'qa', label: 'Q&A Board', icon: HelpCircle, color: 'text-indigo-400' },
       { id: 'focus', label: 'Focus Lab', icon: Timer, color: 'text-rose-400' },
       { id: 'bookmarks', label: 'Bookmarks', icon: Bookmark, color: 'text-amber-400' },
+      { id: 'calendar', label: 'Personal Calendar', icon: Calendar, color: 'text-indigo-400' },
     ],
   },
   career: {
@@ -64,6 +65,14 @@ const NAV_SECTIONS = {
     items: [
       { id: 'grievances', label: 'Grievances', icon: ShieldAlert, color: 'text-rose-400' },
       { id: 'group-study', label: 'Study Rooms', icon: Users, color: 'text-emerald-400' },
+    ],
+  },
+  settings: {
+    title: 'Settings',
+    icon: Settings,
+    items: [
+      { id: 'security', label: 'Security & Privacy', icon: Shield, color: 'text-indigo-400' },
+      { id: 'profile', label: 'My Profile', icon: User, color: 'text-emerald-400' },
     ],
   },
 };
@@ -88,6 +97,7 @@ export default function Sidebar() {
   const [showFriends, setShowFriends] = useState(true);
 
   const isAdmin = user?.roleLevel >= 3;
+  const isSuperAdmin = user?.roleLevel >= 4;
 
   // Listen for Friends
   useEffect(() => {
@@ -196,7 +206,7 @@ export default function Sidebar() {
 
         {/* User Profile / Settings at Bottom */}
         <div className="w-full flex flex-col items-center gap-3 mt-auto">
-          {isAdmin && (
+          {isSuperAdmin && (
              <button
                 onClick={() => { setActiveTab('admin'); setDmTarget(null); }}
                 className={`relative w-10 h-10 rounded-full flex items-center justify-center transition-all group ${activeTab === 'admin' ? 'bg-rose-500 shadow-lg shadow-rose-500/40 text-white' : 'bg-white/5 hover:bg-rose-500/20 text-rose-400'}`}

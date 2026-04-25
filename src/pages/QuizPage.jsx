@@ -22,6 +22,7 @@ export default function QuizPage() {
   const [activeQuiz, setActiveQuiz] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [isFinished, setIsFinished] = useState(false);
@@ -36,6 +37,23 @@ export default function QuizPage() {
   const violationsRef = useRef(0);
   const [timeLeft, setTimeLeft] = useState(0);
   const timerRef = useRef(null);
+
+  if (hasError) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center p-8 text-center bg-slate-950">
+        <div className="w-16 h-16 bg-rose-500/10 rounded-2xl flex items-center justify-center text-rose-500 mb-4 border border-rose-500/20">
+          <AlertCircle size={32} />
+        </div>
+        <h2 className="text-xl font-bold text-white mb-2">Quiz Engine Error</h2>
+        <p className="text-slate-500 text-sm max-w-xs mx-auto mb-6">
+          We encountered a technical issue while initializing the proctoring engine. This may be due to browser restrictions or security rules.
+        </p>
+        <Button variant="primary" onClick={() => window.location.reload()}>Restart Workspace</Button>
+      </div>
+    );
+  }
+
+  if (!user) return null; // Safety gate
 
   useEffect(() => {
     const unsub = onQuizzesChange((data) => { setQuizzes(data); setIsLoading(false); });
@@ -86,15 +104,24 @@ export default function QuizPage() {
     const timeTaken = (quiz.duration * 60) - timeLeftRef.current;
     const tabSwitches = violationsRef.current;
 
-    setResult({ score: finalScore, total: quiz.questions.length, timeTaken, tabSwitches });
+    // Synchronous grading for immediate feedback before cloud function resolves
+    let calculatedScore = 0;
+    quiz.questions.forEach((q, idx) => {
+      if (finalAnswers[q.id || idx] === q.correctOption) {
+        calculatedScore += 1;
+      }
+    });
+
+    setResult({ score: calculatedScore, total: quiz.questions.length, timeTaken, tabSwitches });
 
     try {
-      const submissionId = await submitQuizResult(quiz.id, {
+      const submissionId = await submitQuizResult({
+        quizId: quiz.id,
         userId: user.uid,
         userName: user.name,
         answers: finalAnswers,
         timeTaken,
-        isFlagged: tabSwitches > 2, // Threshold for suspicious activity
+        isFlagged: tabSwitches > 2,
         violationsCount: tabSwitches
       });
 
@@ -215,7 +242,7 @@ export default function QuizPage() {
     }
   }, [activeQuiz, currentQuestionIdx, selectedAnswer, handleFinishQuiz]);
 
-  const canCreate = hasPermission(user.role, 'CREATE_CHANNEL');
+  const canCreate = user && hasPermission(user.role, 'CREATE_CHANNEL');
 
   /* ─── Active Quiz: Grading ─── */
   if (activeQuiz && isFinished && isGrading) {
@@ -575,7 +602,7 @@ export default function QuizPage() {
                     </p>
                     <div className="flex justify-between items-end">
                        <div>
-                          <p className="text-2xl font-black text-white">{user.engagementScore || 0}</p>
+                          <p className="text-2xl font-black text-white">{user?.engagementScore || 0}</p>
                           <p className="text-[9px] text-slate-600 font-bold">Lifetime XP Score</p>
                        </div>
                        <div className="text-right">

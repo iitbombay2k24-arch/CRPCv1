@@ -43,6 +43,8 @@ export default function PlacementPage() {
   const [activeView, setActiveView] = useState('Overview');
   const [realDrives, setRealDrives] = useState([]);
   const [isApplying, setIsApplying] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const canManageDrives = hasPermission(user?.role, 'CREATE_RECRUITER');
 
   useEffect(() => {
     const q = query(collection(db, 'placementDrives'), orderBy('createdAt', 'desc'));

@@ -21,7 +21,7 @@ export default function PostAnnouncementModal({ isOpen, onClose }) {
   const [isPinned, setIsPinned] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const tags = ['Notice', 'Urgent', 'Event', 'Assignment', 'Exam', 'Placement'];
+  const tags = ['Academic', 'Course', 'Syllabus', 'Examination', 'Urgent'];
   const divisions = ['All', 'Division A', 'Division B', 'Faculty Only'];
 
   const handleSubmit = async (e) => {

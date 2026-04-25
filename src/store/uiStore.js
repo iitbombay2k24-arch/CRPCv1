@@ -13,8 +13,12 @@ const useUIStore = create((set) => ({
   dmTarget: null,
   dmList: [],
   callType: 'video',
+  isAdminView: false,
+  activeAdminTab: 'overview',
 
   setActiveTab: (tab) => set({ activeTab: tab }),
+  setIsAdminView: (isAdmin) => set({ isAdminView: isAdmin }),
+  setActiveAdminTab: (tab) => set({ activeAdminTab: tab }),
   toggleDarkMode: () => set(s => ({ isDarkMode: !s.isDarkMode })),
   setSidebarOpen: (open) => set({ isSidebarOpen: open }),
   toggleSidebar: () => set(s => ({ isSidebarOpen: !s.isSidebarOpen })),
