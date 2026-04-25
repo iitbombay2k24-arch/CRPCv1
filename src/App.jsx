@@ -106,9 +106,10 @@ export default function App() {
     );
   }
 
-<<<<<<< HEAD
-  // Unverified -> Verification Barrier
-  if (!isVerified) {
+  // Verification Check
+  const isVerified = firebaseUser?.emailVerified;
+
+  if (firebaseUser && !isVerified) {
     return (
       <div className="h-screen w-screen bg-slate-900 flex items-center justify-center p-6 text-center">
         <div className="max-w-md space-y-8 animate-fade-in">
@@ -155,8 +156,6 @@ export default function App() {
     );
   }
 
-=======
->>>>>>> 2090374977ebe3f64efa2903b53955ba6b940a94
   // Authenticated -> Main Layout
   return (
     <div className="h-screen w-screen bg-slate-900 flex overflow-hidden relative text-slate-200">
@@ -186,73 +185,74 @@ export default function App() {
            }>
              <ErrorBoundary>
                {activeTab === 'dashboard' ? (
-               <DashboardPage />
-             ) : activeTab === 'chat' ? (
-               <ChatPage />
-             ) : activeTab === 'announcements' ? (
-               <AnnouncementPage />
-             ) : activeTab === 'timetable' ? (
-               <TimetablePage />
-             ) : activeTab === 'attendance' ? (
-               <AttendancePage />
-             ) : activeTab === 'resources' ? (
-               <ResourcePage />
-             ) : activeTab === 'tasks' ? (
-               <TaskBoardPage />
-             ) : activeTab === 'qa' ? (
-               <QAPage />
-             ) : activeTab === 'grievances' ? (
-               <GrievancePage />
-             ) : activeTab === 'admin' && user.roleLevel >= 3 ? (
-               <AdminPage />
-             ) : activeTab === 'dm' ? (
-               <DMPage recipient={dmTarget} />
-             ) : activeTab === 'bookmarks' ? (
-               <BookmarksPage />
-             ) : activeTab === 'profile' ? (
-               <ProfilePage />
-             ) : activeTab === 'quizzes' ? (
-               <AssessmentsPage />
-             ) : activeTab === 'live-quizzes' ? (
-               <QuizPage />
-             ) : activeTab === 'placement' ? (
-               <PlacementPage />
-             ) : activeTab === 'leaderboard' ? (
-               <LeaderboardPage />
-             ) : activeTab === 'focus' ? (
-               <FocusPage />
-             ) : activeTab === 'resume-analyzer' ? (
-               <ResumeAnalyzerPage />
-             ) : activeTab === 'interview-forum' ? (
-               <InterviewForumPage />
-             ) : activeTab === 'group-study' ? (
-               <GroupStudyPage />
-             ) : activeTab === 'security' ? (
-               <SecurityPage />
-             ) : activeTab === 'calendar' ? (
-               <CalendarPage />
-             ) : (
-               <div className="h-full w-full flex items-center justify-center text-slate-500 animate-fade-in p-8">
-                  <div className="text-center">
-                    <h1 className="text-4xl font-black text-slate-800 mb-4 uppercase tracking-tighter opacity-20">Work in Progress</h1>
-                    <h3 className="text-xl font-bold text-slate-300 mb-2 capitalize">{activeTab} Page</h3>
-                    <p className="max-w-xs mx-auto text-sm text-slate-500">
-                      Currently building the {activeTab} engine. Stay tuned for real-time updates.
-                    </p>
-                    <div className="mt-8 flex gap-2 justify-center">
-                       <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce duration-700" />
-                       <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce duration-700 delay-150" />
-                       <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce duration-700 delay-300" />
+                 <DashboardPage />
+               ) : activeTab === 'chat' ? (
+                 <ChatPage />
+               ) : activeTab === 'announcements' ? (
+                 <AnnouncementPage />
+               ) : activeTab === 'timetable' ? (
+                 <TimetablePage />
+               ) : activeTab === 'attendance' ? (
+                 <AttendancePage />
+               ) : activeTab === 'resources' ? (
+                 <ResourcePage />
+               ) : activeTab === 'tasks' ? (
+                 <TaskBoardPage />
+               ) : activeTab === 'qa' ? (
+                 <QAPage />
+               ) : activeTab === 'grievances' ? (
+                 <GrievancePage />
+               ) : activeTab === 'admin' && user.roleLevel >= 3 ? (
+                 <AdminPage />
+               ) : activeTab === 'dm' ? (
+                 <DMPage recipient={dmTarget} />
+               ) : activeTab === 'bookmarks' ? (
+                 <BookmarksPage />
+               ) : activeTab === 'profile' ? (
+                 <ProfilePage />
+               ) : activeTab === 'quizzes' ? (
+                 <AssessmentsPage />
+               ) : activeTab === 'live-quizzes' ? (
+                 <QuizPage />
+               ) : activeTab === 'placement' ? (
+                 <PlacementPage />
+               ) : activeTab === 'leaderboard' ? (
+                 <LeaderboardPage />
+               ) : activeTab === 'focus' ? (
+                 <FocusPage />
+               ) : activeTab === 'resume-analyzer' ? (
+                 <ResumeAnalyzerPage />
+               ) : activeTab === 'interview-forum' ? (
+                 <InterviewForumPage />
+               ) : activeTab === 'group-study' ? (
+                 <GroupStudyPage />
+               ) : activeTab === 'security' ? (
+                 <SecurityPage />
+               ) : activeTab === 'calendar' ? (
+                 <CalendarPage />
+               ) : (
+                 <div className="h-full w-full flex items-center justify-center text-slate-500 animate-fade-in p-8">
+                    <div className="text-center">
+                      <h1 className="text-4xl font-black text-slate-800 mb-4 uppercase tracking-tighter opacity-20">Work in Progress</h1>
+                      <h3 className="text-xl font-bold text-slate-300 mb-2 capitalize">{activeTab} Page</h3>
+                      <p className="max-w-xs mx-auto text-sm text-slate-500">
+                        Currently building the {activeTab} engine. Stay tuned for real-time updates.
+                      </p>
+                      <div className="mt-8 flex gap-2 justify-center">
+                         <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce duration-700" />
+                         <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce duration-700 delay-150" />
+                         <div className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce duration-700 delay-300" />
+                      </div>
                     </div>
-                  </div>
-               </div>
-             )}
+                 </div>
+               )}
              </ErrorBoundary>
-            </Suspense>
+           </Suspense>
         </main>
       </div>
 
       <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+      <FacultyAlertTray />
       
       {/* Floating Feedback Button */}
       <button 
@@ -266,7 +266,6 @@ export default function App() {
       </button>
 
       <ToastContainer />
-      <FacultyAlertTray />
     </div>
   );
 }
